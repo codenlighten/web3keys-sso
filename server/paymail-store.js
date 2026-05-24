@@ -3,11 +3,27 @@ import path from 'node:path';
 
 export const HANDLE_RE = /^[a-z0-9](?:[a-z0-9_-]{1,30}[a-z0-9])?$/;
 
-// A small set of reserved handles. Real list would live in config.
+// Reserved handles. Squat targets, internal routes, and identity-sensitive names.
 const RESERVED = new Set([
-  'admin', 'root', 'support', 'help', 'about', 'system', 'web3keys', 'paymail',
-  'verify', 'claim', 'api', 'sdk', 'docs', 'wallet', 'login', 'signin', 'signup',
-  'me', 'you', 'i', 'we', 'us', 'team', 'official',
+  // Internal / system
+  'admin', 'administrator', 'root', 'system', 'webmaster', 'support', 'help',
+  'about', 'contact', 'legal', 'privacy', 'terms', 'security', 'abuse', 'noreply',
+  // Product routes (mirror server.js so handles can't shadow real URLs)
+  'app', 'api', 'sdk', 'sso', 'verify', 'recover', 'demo', 'u', 'healthz',
+  'claim', 'docs', 'developers', 'developer', 'dev',
+  // Brand / company
+  'web3keys', 'w3k', 'paymail', 'smartledger',
+  // Common-noun squat targets
+  'wallet', 'login', 'signin', 'signup', 'register', 'account', 'accounts',
+  'me', 'you', 'i', 'we', 'us', 'team', 'official', 'verified', 'identity',
+  // Operations
+  'noreply', 'no-reply', 'mailer', 'postmaster', 'hostmaster',
+  // High-value generics
+  'crypto', 'bitcoin', 'btc', 'bsv', 'eth', 'ethereum', 'nft',
+  'ai', 'gpt', 'claude', 'anthropic', 'openai',
+  // Single-character + ultra-short
+  'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+  'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
 ]);
 
 export function createPaymailStore(dataDir) {
@@ -25,16 +41,29 @@ export function createPaymailStore(dataDir) {
   }
 
   return {
+    isShapeValid(handle) {
+      return typeof handle === 'string' && HANDLE_RE.test(handle);
+    },
+    isReserved(handle) {
+      return RESERVED.has(String(handle || '').toLowerCase());
+    },
+    // Kept for routes/callers that combine all three checks.
     isValid(handle) {
-      return typeof handle === 'string'
-        && HANDLE_RE.test(handle)
-        && !RESERVED.has(handle);
+      return this.isShapeValid(handle) && !this.isReserved(handle);
     },
     isAvailable(handle) {
       const h = String(handle || '').toLowerCase();
       if (!this.isValid(h)) return false;
       const state = readSync();
       return !state.handles[h];
+    },
+    availabilityReason(handle) {
+      const h = String(handle || '').toLowerCase();
+      if (!this.isShapeValid(h)) return 'invalid';
+      if (this.isReserved(h)) return 'reserved';
+      const state = readSync();
+      if (state.handles[h]) return 'taken';
+      return null;
     },
     get(handle) {
       const state = readSync();

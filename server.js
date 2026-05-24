@@ -52,12 +52,15 @@ app.get('/healthz', (_req, res) => res.json({ ok: true }));
 
 // ---- Paymail registry ----
 
+const limiterPaymailClaim = rateLimit({ windowMs: 60 * 60 * 1000, max: 12, standardHeaders: true });
+
 app.get('/api/paymail/check/:handle', (req, res) => {
   const h = String(req.params.handle || '').toLowerCase();
-  if (!paymail.isValid(h)) {
+  if (!paymail.isShapeValid(h)) {
     return res.status(400).json({ ok: false, reason: 'invalid' });
   }
-  return res.json({ ok: true, handle: h, available: paymail.isAvailable(h) });
+  const reason = paymail.availabilityReason(h); // 'reserved' | 'taken' | null
+  return res.json({ ok: true, handle: h, available: !reason, reason: reason || undefined });
 });
 
 app.get('/api/paymail/:handle', (req, res) => {
@@ -66,7 +69,7 @@ app.get('/api/paymail/:handle', (req, res) => {
   return res.json({ ok: true, ...record });
 });
 
-app.post('/api/paymail/claim', (req, res) => {
+app.post('/api/paymail/claim', limiterPaymailClaim, (req, res) => {
   try {
     const { handle, pubKey, address, displayName, message, signature } = req.body || {};
 
@@ -269,6 +272,13 @@ app.use(express.static(path.join(__dirname, 'public'), {
   },
 }));
 
-app.listen(PORT, HOST, () => {
-  console.log(`web3keys listening on http://${HOST}:${PORT}`);
-});
+// Only listen when run as the main module; tests import this file and drive
+// the express app via supertest without binding a real port.
+const isMain = import.meta.url === `file://${process.argv[1]}`;
+if (isMain) {
+  app.listen(PORT, HOST, () => {
+    console.log(`web3keys listening on http://${HOST}:${PORT}`);
+  });
+}
+
+export { app };
