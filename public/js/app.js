@@ -1,6 +1,6 @@
 import {
   randomBytes, bytesToBase64, base64ToBytes,
-  kekFromPrf, kekFromPassword, wrap, unwrap,
+  kekFromPrf, kekFromPassword, wrap,
 } from './crypto.js';
 import {
   isPlatformAuthAvailable,
@@ -8,6 +8,11 @@ import {
   registerPasskey, getPrfSecret,
 } from './biometric.js';
 import { getVault, putVault, clearVault } from './vault.js';
+import { requestConsent } from './consent.js';
+import {
+  signMessage, parseTransaction, summarizeTransaction, signTransaction,
+  signHash, encryptForRecipient, decryptIncoming,
+} from './sign.js';
 
 const IDENTITY_PATH = "m/44'/236'/0'/0/0";
 const INFO_WIF = 'web3keys/v1/wif-wrap';
@@ -19,7 +24,7 @@ const status = (msg, kind = 'info') => {
   el.textContent = msg || '';
   el.dataset.kind = kind;
 };
-const show = (id) => {
+const showView = (id) => {
   for (const s of document.querySelectorAll('main > section')) s.hidden = true;
   $(id).hidden = false;
 };
@@ -29,7 +34,6 @@ function bsvLib() {
   if (!lib) throw new Error('BSV library failed to load.');
   return lib;
 }
-
 function MnemonicClass() {
   return window.bsvMnemonic || window.Mnemonic || (window.bsv && window.bsv.Mnemonic);
 }
@@ -53,25 +57,19 @@ async function buildWrappings({ mnemonic, wif, passphrase, passkey }) {
   const wrappedWif = {};
   const wrappedMnemonic = {};
 
-  // Password wrapping (always present as fallback).
   const pwdSalt = randomBytes(16);
   const kekPwd = await kekFromPassword(passphrase, pwdSalt);
   wrappedWif.password = {
-    salt: bytesToBase64(pwdSalt),
-    iters: 600000,
-    kdf: 'PBKDF2-SHA256',
+    salt: bytesToBase64(pwdSalt), iters: 600000, kdf: 'PBKDF2-SHA256',
     ...(await wrap(kekPwd, wif)),
   };
   const pwdSaltM = randomBytes(16);
   const kekPwdM = await kekFromPassword(passphrase, pwdSaltM);
   wrappedMnemonic.password = {
-    salt: bytesToBase64(pwdSaltM),
-    iters: 600000,
-    kdf: 'PBKDF2-SHA256',
+    salt: bytesToBase64(pwdSaltM), iters: 600000, kdf: 'PBKDF2-SHA256',
     ...(await wrap(kekPwdM, mnemonic)),
   };
 
-  // Biometric wrapping (optional, requires PRF).
   let bioEnabled = false;
   let prfBytes = passkey.prfFromCreate;
   if (!prfBytes) {
@@ -104,50 +102,23 @@ async function buildWrappings({ mnemonic, wif, passphrase, passkey }) {
   return { wrappedWif, wrappedMnemonic, bioEnabled };
 }
 
-async function unlockWifPassword(vault, passphrase) {
-  const w = vault.wrappedWif.password;
-  const salt = base64ToBytes(w.salt);
-  const kek = await kekFromPassword(passphrase, salt, w.iters);
-  try {
-    return await unwrap(kek, w);
-  } catch (e) {
-    throw new Error('Wrong password.');
-  }
+let cachedVault = null;
+async function activeVault() {
+  if (!cachedVault) cachedVault = await getVault();
+  return cachedVault;
 }
-
-async function unlockWifBiometric(vault) {
-  const w = vault.wrappedWif.biometric;
-  if (!w) throw new Error('Biometric not configured for this account.');
-  const prfBytes = await getPrfSecret({
-    credentialIdB64: w.credentialId,
-    prfSaltB64: w.prfSalt,
-  });
-  const kek = await kekFromPrf(prfBytes, INFO_WIF);
-  prfBytes.fill(0);
-  return unwrap(kek, w);
-}
-
-async function signMessageWithWif(wif, message) {
-  const bsv = bsvLib();
-  const priv = bsv.PrivateKey.fromWIF(wif);
-  const sig = bsv.Message(message).sign(priv);
-  const address = bsv.Address.fromPrivateKey(priv).toString();
-  const verified = bsv.Message(message).verify(address, sig);
-  return { signature: sig, address, verified };
-}
+function invalidateVault() { cachedVault = null; }
 
 async function refreshAccountView(vault) {
   $('#acct-address').textContent = vault.address;
   $('#acct-pubkey').textContent = vault.pubKey;
   const pill = $('#acct-biometric');
   if (vault.wrappedWif.biometric) {
-    pill.textContent = 'Enabled';
-    pill.dataset.kind = 'ok';
+    pill.textContent = 'Enabled'; pill.dataset.kind = 'ok';
   } else {
-    pill.textContent = 'Password only';
-    pill.dataset.kind = 'warn';
+    pill.textContent = 'Password only'; pill.dataset.kind = 'warn';
   }
-  show('#view-account');
+  showView('#view-account');
 }
 
 async function boot() {
@@ -160,20 +131,20 @@ async function boot() {
     }
   }
 
-  const vault = await getVault();
-  if (vault) {
-    await refreshAccountView(vault);
-  } else {
-    show('#view-empty');
-  }
+  const vault = await activeVault();
+  if (vault) await refreshAccountView(vault);
+  else showView('#view-empty');
 
   wireCreate();
   wireRestore();
-  wireSign();
+  wireTabs();
+  wireMessage();
+  wireTransaction();
+  wireHash();
+  wireEncrypt();
   wireAccountActions();
 }
 
-let pendingMnemonic = null;
 let pendingVault = null;
 
 function wireCreate() {
@@ -199,23 +170,16 @@ function wireCreate() {
       });
 
       const vault = {
-        v: 1,
-        createdAt: new Date().toISOString(),
-        idPath: IDENTITY_PATH,
-        pubKey: identity.pubKey,
-        address: identity.address,
-        paymail: null,
-        wrappedWif,
-        wrappedMnemonic,
+        v: 1, createdAt: new Date().toISOString(), idPath: IDENTITY_PATH,
+        pubKey: identity.pubKey, address: identity.address, paymail: null,
+        wrappedWif, wrappedMnemonic,
       };
 
-      pendingMnemonic = mnemonic;
       pendingVault = vault;
-
       $('#mnemonic-display').textContent = mnemonic;
       $('#mnemonic-confirm').checked = false;
       $('#mnemonic-continue').disabled = true;
-      show('#view-mnemonic');
+      showView('#view-mnemonic');
       status(bioEnabled ? 'Biometric enabled.' : 'Biometric PRF not supported — password fallback only.', bioEnabled ? 'ok' : 'warn');
     } catch (err) {
       console.error(err);
@@ -229,7 +193,7 @@ function wireCreate() {
   $('#mnemonic-continue').addEventListener('click', async () => {
     if (!pendingVault) return;
     await putVault(pendingVault);
-    pendingMnemonic = null;
+    invalidateVault();
     const v = pendingVault;
     pendingVault = null;
     await refreshAccountView(v);
@@ -262,16 +226,12 @@ function wireRestore() {
       });
 
       const vault = {
-        v: 1,
-        createdAt: new Date().toISOString(),
-        idPath: IDENTITY_PATH,
-        pubKey: identity.pubKey,
-        address: identity.address,
-        paymail: null,
-        wrappedWif,
-        wrappedMnemonic,
+        v: 1, createdAt: new Date().toISOString(), idPath: IDENTITY_PATH,
+        pubKey: identity.pubKey, address: identity.address, paymail: null,
+        wrappedWif, wrappedMnemonic,
       };
       await putVault(vault);
+      invalidateVault();
       await refreshAccountView(vault);
       status(bioEnabled ? 'Restored. Biometric enabled.' : 'Restored. Password-only on this device.', 'ok');
     } catch (err) {
@@ -281,39 +241,254 @@ function wireRestore() {
   });
 }
 
-function wireSign() {
-  $('#form-sign').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const message = $('#sign-message').value;
-    if (!message) return;
-    const vault = await getVault();
-    if (!vault) return;
+function wireTabs() {
+  const tabs = document.querySelectorAll('.tab');
+  tabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      tabs.forEach((t) => t.setAttribute('aria-selected', t === tab ? 'true' : 'false'));
+      const name = tab.dataset.tab;
+      document.querySelectorAll('.tab-panel').forEach((p) => {
+        p.hidden = p.dataset.panel !== name;
+      });
+    });
+  });
+  const subtabs = document.querySelectorAll('.subtab');
+  subtabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      subtabs.forEach((t) => t.setAttribute('aria-selected', t === tab ? 'true' : 'false'));
+      const mode = tab.dataset.mode;
+      document.querySelectorAll('.subtab-panel').forEach((p) => {
+        p.hidden = p.dataset.mode !== mode;
+      });
+    });
+  });
+}
 
-    const usePassword = $('#use-password').checked;
-    let wif;
+function biometricAvailable(vault) { return !!vault.wrappedWif.biometric; }
+
+function wireMessage() {
+  $('#form-message').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const vault = await activeVault();
+    if (!vault) return;
+    const message = $('#msg-text').value;
+    if (!message) return;
+
+    const consent = await requestConsent({
+      kind: 'message',
+      title: 'Sign a message',
+      risk: 'low',
+      summary: [
+        { label: 'Address', value: vault.address, mono: true },
+        { label: 'Message', value: message.length > 200 ? message.slice(0, 200) + '…' : message },
+      ],
+      detail: message.length > 200 ? message : null,
+      biometricAvailable: biometricAvailable(vault),
+    });
+    if (!consent.approved) { status('Cancelled.'); return; }
+
     try {
-      if (usePassword) {
-        const pwd = prompt('Recovery passphrase');
-        if (!pwd) { status('Cancelled.'); return; }
-        status('Decrypting with password…');
-        wif = await unlockWifPassword(vault, pwd);
-      } else {
-        if (!vault.wrappedWif.biometric) {
-          status('Biometric is not configured. Use the password option.', 'warn');
-          return;
-        }
-        status('Awaiting biometric…');
-        wif = await unlockWifBiometric(vault);
-      }
-      status('Signing…');
-      const { signature, verified } = await signMessageWithWif(wif, message);
-      wif = '';
-      $('#sign-signature').textContent = signature;
-      const verEl = $('#sign-verified');
+      status('Signing message…');
+      const { signature, verified } = await signMessage(vault, consent, message);
+      $('#msg-signature').textContent = signature;
+      const verEl = $('#msg-verified');
       verEl.textContent = verified ? 'Yes' : 'No';
       verEl.dataset.kind = verified ? 'ok' : 'error';
-      $('#sign-result').hidden = false;
-      status('Signed.', 'ok');
+      $('#msg-result').hidden = false;
+      status('Message signed.', 'ok');
+    } catch (err) {
+      console.error(err);
+      status(err.message || String(err), 'error');
+    }
+  });
+}
+
+function fmtSats(n) {
+  if (n == null) return '—';
+  return `${n.toLocaleString()} sat`;
+}
+
+function txConsentSummary(summary, ourAddress) {
+  const rows = [
+    { label: 'Inputs', value: `${summary.inputs.length} (${summary.ourInputCount} from this identity)` },
+    { label: 'Outputs', value: String(summary.outputs.length) },
+    { label: 'Total in', value: fmtSats(summary.totalIn) },
+    { label: 'Total out', value: fmtSats(summary.totalOut) },
+    { label: 'Fee', value: fmtSats(summary.fee) },
+    { label: 'You receive', value: fmtSats(summary.toUs), highlight: summary.toUs > 0 },
+    { label: 'You spend', value: fmtSats(summary.fromUs), highlight: summary.fromUs > 0 },
+  ];
+  summary.outputs.forEach((o) => {
+    if (o.isData) {
+      rows.push({ label: `Out #${o.index}`, value: 'OP_RETURN (data)', mono: true });
+    } else if (o.address) {
+      const tag = o.address === ourAddress ? ' (to you)' : '';
+      rows.push({ label: `Out #${o.index}`, value: `${fmtSats(o.satoshis)} → ${o.address}${tag}`, mono: true, highlight: !!tag });
+    } else {
+      rows.push({ label: `Out #${o.index}`, value: `${fmtSats(o.satoshis)} → ${o.scriptHex.slice(0, 40)}…`, mono: true });
+    }
+  });
+  return rows;
+}
+
+function wireTransaction() {
+  $('#btn-tx-preview').addEventListener('click', async () => {
+    const vault = await activeVault();
+    if (!vault) return;
+    try {
+      const tx = parseTx();
+      const summary = summarizeTransaction(tx, vault.address);
+      alert(JSON.stringify(summary, null, 2));
+    } catch (e) {
+      status(e.message, 'error');
+    }
+  });
+
+  function parseTx() {
+    const rawHex = $('#tx-raw').value.trim();
+    if (!rawHex) throw new Error('Paste a raw transaction hex.');
+    let utxos = [];
+    const utxoText = $('#tx-utxo').value.trim();
+    if (utxoText) {
+      try { utxos = JSON.parse(utxoText); }
+      catch { throw new Error('UTXO context must be valid JSON.'); }
+      if (!Array.isArray(utxos)) throw new Error('UTXO context must be a JSON array.');
+    }
+    return parseTransaction(rawHex, utxos);
+  }
+
+  $('#form-tx').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const vault = await activeVault();
+    if (!vault) return;
+    try {
+      const tx = parseTx();
+      const summary = summarizeTransaction(tx, vault.address);
+      if (summary.ourInputCount === 0) {
+        if (!confirm('No inputs to this transaction belong to your address. Sign anyway?')) return;
+      }
+      const risk = summary.fromUs > summary.toUs * 1.5 ? 'high' : 'normal';
+      const consent = await requestConsent({
+        kind: 'transaction',
+        title: summary.fromUs > 0 ? `Spend ${fmtSats(summary.fromUs)}` : 'Sign transaction',
+        risk,
+        summary: txConsentSummary(summary, vault.address),
+        detail: tx.toString(),
+        warning: summary.fee != null && summary.fee < 0 ? 'Outputs exceed inputs — this transaction is invalid.' : null,
+        biometricAvailable: biometricAvailable(vault),
+      });
+      if (!consent.approved) { status('Cancelled.'); return; }
+
+      status('Signing transaction…');
+      const { rawHex, txid } = await signTransaction(vault, consent, tx);
+      $('#tx-txid').textContent = txid;
+      $('#tx-rawsigned').textContent = rawHex;
+      $('#tx-result').hidden = false;
+      status('Transaction signed.', 'ok');
+    } catch (err) {
+      console.error(err);
+      status(err.message || String(err), 'error');
+    }
+  });
+}
+
+function wireHash() {
+  $('#form-hash').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const vault = await activeVault();
+    if (!vault) return;
+    const digest = $('#hash-digest').value.trim().toLowerCase();
+    const intent = $('#hash-intent').value.trim();
+    if (!/^[0-9a-f]{64}$/.test(digest)) { status('Digest must be 64 hex characters.', 'error'); return; }
+
+    const consent = await requestConsent({
+      kind: 'hash',
+      title: 'Sign an opaque 32-byte hash',
+      risk: 'danger',
+      summary: [
+        { label: 'Intent', value: intent || '(none provided)' },
+        { label: 'Digest', value: digest, mono: true },
+        { label: 'Signing key', value: vault.address, mono: true },
+      ],
+      warning: 'You are about to sign an arbitrary digest. The wallet cannot see what this hash represents. A malicious requester could trick you into signing a transaction or other data this way. Only proceed if you trust the requester.',
+      approveLabel: 'I trust this request — sign hash',
+      biometricAvailable: biometricAvailable(vault),
+    });
+    if (!consent.approved) { status('Cancelled.'); return; }
+
+    try {
+      status('Signing digest…');
+      const { derHex } = await signHash(vault, consent, digest);
+      $('#hash-derhex').textContent = derHex;
+      $('#hash-result').hidden = false;
+      status('Hash signed.', 'ok');
+    } catch (err) {
+      console.error(err);
+      status(err.message || String(err), 'error');
+    }
+  });
+}
+
+function wireEncrypt() {
+  $('#form-encrypt').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const vault = await activeVault();
+    if (!vault) return;
+    const plain = $('#enc-plain').value;
+    const pub = $('#enc-pub').value.trim().toLowerCase();
+    if (!plain) return;
+
+    const consent = await requestConsent({
+      kind: 'encrypt',
+      title: 'Encrypt for a recipient',
+      risk: 'low',
+      summary: [
+        { label: 'From', value: vault.pubKey, mono: true },
+        { label: 'To', value: pub, mono: true },
+        { label: 'Bytes', value: String(new TextEncoder().encode(plain).length) },
+      ],
+      detail: plain.length > 200 ? null : plain,
+      biometricAvailable: biometricAvailable(vault),
+    });
+    if (!consent.approved) { status('Cancelled.'); return; }
+
+    try {
+      status('Encrypting…');
+      const { ciphertextB64 } = await encryptForRecipient(vault, consent, plain, pub);
+      $('#enc-ciphertext').textContent = ciphertextB64;
+      $('#enc-result').hidden = false;
+      status('Encrypted.', 'ok');
+    } catch (err) {
+      console.error(err);
+      status(err.message || String(err), 'error');
+    }
+  });
+
+  $('#form-decrypt').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const vault = await activeVault();
+    if (!vault) return;
+    const ct = $('#dec-ct').value.trim();
+    if (!ct) return;
+
+    const consent = await requestConsent({
+      kind: 'decrypt',
+      title: 'Decrypt with your identity key',
+      risk: 'low',
+      summary: [
+        { label: 'Recipient', value: vault.pubKey, mono: true },
+        { label: 'Ciphertext bytes', value: String(Math.floor(ct.length * 0.75)) },
+      ],
+      biometricAvailable: biometricAvailable(vault),
+    });
+    if (!consent.approved) { status('Cancelled.'); return; }
+
+    try {
+      status('Decrypting…');
+      const { plaintext } = await decryptIncoming(vault, consent, ct);
+      $('#dec-plain').textContent = plaintext;
+      $('#dec-result').hidden = false;
+      status('Decrypted.', 'ok');
     } catch (err) {
       console.error(err);
       status(err.message || String(err), 'error');
@@ -323,16 +498,15 @@ function wireSign() {
 
 function wireAccountActions() {
   $('#btn-signout').addEventListener('click', () => {
-    // Phase 1: just hide the account view. Vault stays on device.
-    show('#view-empty');
+    showView('#view-empty');
     status('Signed out on this tab. Vault remains on this device.', 'info');
   });
   $('#btn-reset').addEventListener('click', async () => {
     if (!confirm('Erase the Web3Keys vault from this device? You will need your recovery phrase to restore it.')) return;
     await clearVault();
-    pendingMnemonic = null;
+    invalidateVault();
     pendingVault = null;
-    show('#view-empty');
+    showView('#view-empty');
     status('Device erased.', 'ok');
   });
 }

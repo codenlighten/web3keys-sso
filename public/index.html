@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="/styles.css" />
   <script src="/vendor/bsv.bundle.js"></script>
   <script src="/vendor/bsv-mnemonic.min.js"></script>
+  <script src="/vendor/bsv-ecies.min.js"></script>
 </head>
 <body>
   <main class="card" id="app">
@@ -64,22 +65,105 @@
         <div class="row"><span class="label">Biometric</span><span id="acct-biometric" class="pill"></span></div>
       </div>
 
-      <h2>Sign a message</h2>
-      <form id="form-sign">
-        <textarea id="sign-message" rows="3" placeholder="Anything you want to sign…" required></textarea>
-        <div class="actions">
-          <button class="primary" type="submit">Sign</button>
-          <label class="inline">
-            <input id="use-password" type="checkbox" />
-            <span>Use password instead of biometric</span>
-          </label>
-        </div>
-      </form>
+      <nav class="tabs" role="tablist">
+        <button class="tab" role="tab" data-tab="message" aria-selected="true">Message</button>
+        <button class="tab" role="tab" data-tab="transaction">Transaction</button>
+        <button class="tab" role="tab" data-tab="hash">Hash</button>
+        <button class="tab" role="tab" data-tab="ecies">Encrypt / Decrypt</button>
+      </nav>
 
-      <div id="sign-result" hidden>
-        <h3>Signature</h3>
-        <pre id="sign-signature" class="signature"></pre>
-        <div class="row"><span class="label">Verified</span><span id="sign-verified" class="pill"></span></div>
+      <div class="tab-panel" data-panel="message">
+        <form id="form-message">
+          <label>
+            <span>Message</span>
+            <textarea id="msg-text" rows="3" placeholder="Anything you want to sign…" required></textarea>
+          </label>
+          <button class="primary" type="submit">Sign message</button>
+        </form>
+        <div class="result" id="msg-result" hidden>
+          <h3>Signature</h3>
+          <pre id="msg-signature" class="signature"></pre>
+          <div class="row"><span class="label">Verified</span><span id="msg-verified" class="pill"></span></div>
+        </div>
+      </div>
+
+      <div class="tab-panel" data-panel="transaction" hidden>
+        <form id="form-tx">
+          <label>
+            <span>Raw transaction (hex)</span>
+            <textarea id="tx-raw" rows="4" placeholder="0100000001..." required></textarea>
+          </label>
+          <label>
+            <span>UTXO context (JSON)</span>
+            <textarea id="tx-utxo" rows="4" placeholder='[{"index":0,"scriptPubKey":"76a914...88ac","satoshis":1000}]'></textarea>
+            <small class="muted">Required so the wallet can compute sighash and show the fee. One entry per input you want signed.</small>
+          </label>
+          <div class="actions">
+            <button class="ghost" type="button" id="btn-tx-preview">Preview</button>
+            <button class="primary" type="submit">Sign transaction</button>
+          </div>
+        </form>
+        <div class="result" id="tx-result" hidden>
+          <h3>Signed transaction</h3>
+          <div class="row"><span class="label">TXID</span><code id="tx-txid"></code></div>
+          <pre id="tx-rawsigned" class="signature"></pre>
+        </div>
+      </div>
+
+      <div class="tab-panel" data-panel="hash" hidden>
+        <div class="consent-warning small">Hash signing produces a signature over an opaque 32-byte digest. The wallet cannot tell you what the digest represents — only sign hashes from sources you trust.</div>
+        <form id="form-hash">
+          <label>
+            <span>32-byte digest (hex)</span>
+            <input id="hash-digest" type="text" pattern="[0-9a-fA-F]{64}" maxlength="64" placeholder="64 hex characters" required />
+          </label>
+          <label>
+            <span>What does this hash represent? (shown in consent)</span>
+            <input id="hash-intent" type="text" placeholder="e.g. login challenge for example.com" required />
+          </label>
+          <button class="primary" type="submit">Sign hash</button>
+        </form>
+        <div class="result" id="hash-result" hidden>
+          <h3>Signature (DER)</h3>
+          <pre id="hash-derhex" class="signature"></pre>
+        </div>
+      </div>
+
+      <div class="tab-panel" data-panel="ecies" hidden>
+        <nav class="subtabs">
+          <button class="subtab" data-mode="encrypt" aria-selected="true">Encrypt</button>
+          <button class="subtab" data-mode="decrypt">Decrypt</button>
+        </nav>
+        <div class="subtab-panel" data-mode="encrypt">
+          <form id="form-encrypt">
+            <label>
+              <span>Plaintext</span>
+              <textarea id="enc-plain" rows="3" placeholder="A secret note for the recipient…" required></textarea>
+            </label>
+            <label>
+              <span>Recipient public key (hex, 33 bytes compressed)</span>
+              <input id="enc-pub" type="text" pattern="0[23][0-9a-fA-F]{64}" maxlength="66" placeholder="02ab…" required />
+            </label>
+            <button class="primary" type="submit">Encrypt</button>
+          </form>
+          <div class="result" id="enc-result" hidden>
+            <h3>Ciphertext (base64)</h3>
+            <pre id="enc-ciphertext" class="signature"></pre>
+          </div>
+        </div>
+        <div class="subtab-panel" data-mode="decrypt" hidden>
+          <form id="form-decrypt">
+            <label>
+              <span>Ciphertext (base64)</span>
+              <textarea id="dec-ct" rows="3" required></textarea>
+            </label>
+            <button class="primary" type="submit">Decrypt</button>
+          </form>
+          <div class="result" id="dec-result" hidden>
+            <h3>Plaintext</h3>
+            <pre id="dec-plain" class="signature"></pre>
+          </div>
+        </div>
       </div>
 
       <footer class="account-footer">
