@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SimpleBSV // Neural Terminal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --neon-blue: #00f2ff;
+            --neon-green: #39ff14;
+            --neon-purple: #bc13fe;
+            --bg-dark: #06070a;
+            --glass: rgba(10, 11, 16, 0.7);
+            --glass-border: rgba(0, 242, 255, 0.2);
+        }
+
+        * { box-sizing: border-box; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #e0e0e0;
+            margin: 0;
+            padding: 40px 20px;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Particle Canvas Background */
+        #particle-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        h2 {
+            font-weight: 700;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            text-align: center;
+            color: var(--neon-blue);
+            text-shadow: 0 0 20px rgba(0, 242, 255, 0.6);
+            margin-bottom: 50px;
+        }
+
+        .card {
+            background: var(--glass);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 25px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        label {
+            display: block;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 12px;
+            color: var(--neon-blue);
+            opacity: 0.8;
+        }
+
+        input, textarea {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            padding: 16px;
+            color: #fff;
+            font-family: 'Fira Code', monospace;
+            font-size: 14px;
+            outline: none;
+        }
+
+        input:focus {
+            border-color: var(--neon-blue);
+            box-shadow: 0 0 15px rgba(0, 242, 255, 0.3);
+        }
+
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        button {
+            background: transparent;
+            border: 1px solid var(--neon-blue);
+            color: var(--neon-blue);
+            padding: 14px;
+            border-radius: 10px;
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 12px;
+        }
+
+        button:hover {
+            background: var(--neon-blue);
+            color: var(--bg-dark);
+            box-shadow: 0 0 25px var(--neon-blue);
+            transform: translateY(-2px);
+        }
+
+        #pubBtn {
+            border-color: var(--neon-purple);
+            color: var(--neon-purple);
+            width: 100%;
+            margin-top: 15px;
+        }
+
+        #pubBtn:hover {
+            background: var(--neon-purple);
+            color: white;
+            box-shadow: 0 0 25px var(--neon-purple);
+        }
+
+        .response-area {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid var(--glass-border);
+            color: var(--neon-green);
+            padding: 20px;
+            border-radius: 12px;
+            font-family: 'Fira Code', monospace;
+            font-size: 13px;
+            min-height: 120px;
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+
+        .status-badge {
+            font-size: 11px;
+            padding: 4px 12px;
+            border-radius: 50px;
+            margin-bottom: 15px;
+            display: inline-block;
+            background: rgba(0,0,0,0.5);
+        }
+
+        .success { color: var(--neon-green); border: 1px solid var(--neon-green); }
+        .error { color: #ff4d4d; border: 1px solid #ff4d4d; }
+
+        /* Custom Scrollbar for response */
+        .response-area::-webkit-scrollbar { width: 4px; }
+        .response-area::-webkit-scrollbar-thumb { background: var(--neon-blue); }
+
+    </style>
+</head>
+<body>
+
+<canvas id="particle-canvas"></canvas>
+
+<div class="container">
+    <h2>SimpleBSV Terminal</h2>
+    
+    <div class="card">
+        <label>Uplink Authorization</label>
+        <input type="password" id="apiKey" placeholder="ENTER_API_KEY">
+        <div class="button-group">
+            <button onclick="checkHealth()">Node Status</button>
+            <button onclick="checkWallets()">Query Wallets</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <label>Data Injection</label>
+        <textarea id="textContent" rows="3" placeholder="Write to the ledger..."></textarea>
+        <button id="pubBtn" onclick="publishData()">Broadcast to Chain</button>
+    </div>
+
+    <div class="card">
+        <label>System Output</label>
+        <div id="status"></div>
+        <div class="response-area" id="output">SYSTEM::STANDBY...</div>
+    </div>
+</div>
+
+<script>
+    // --- PARTICLE SYSTEM ENGINE ---
+    const canvas = document.getElementById('particle-canvas');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+
+    function initParticles() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        particles = [];
+        for (let i = 0; i < 80; i++) {
+            particles.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                vx: (Math.random() - 0.5) * 0.5,
+                vy: (Math.random() - 0.5) * 0.5,
+                radius: Math.random() * 2
+            });
+        }
+    }
+
+    function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "rgba(0, 242, 255, 0.5)";
+        ctx.strokeStyle = "rgba(0, 242, 255, 0.05)";
+
+        particles.forEach((p, i) => {
+            p.x += p.vx;
+            p.y += p.vy;
+
+            if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+            if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            for (let j = i + 1; j < particles.length; j++) {
+                const p2 = particles[j];
+                const dist = Math.hypot(p.x - p2.x, p.y - p2.y);
+                if (dist < 150) {
+                    ctx.beginPath();
+                    ctx.moveTo(p.x, p.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.stroke();
+                }
+            }
+        });
+        requestAnimationFrame(animate);
+    }
+
+    window.addEventListener('resize', initParticles);
+    initParticles();
+    animate();
+
+    // --- API LOGIC ---
+    const BASE_URL = 'https://simplebsv.codenlighten.org';
+
+    async function apiCall(endpoint, method = 'GET', body = null) {
+        const key = document.getElementById('apiKey').value;
+        const output = document.getElementById('output');
+        const status = document.getElementById('status');
+        
+        output.textContent = ">> EXECUTING COMMAND...";
+        status.innerHTML = '';
+
+        try {
+            const options = {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${key}`,
+                    'x-api-key': key
+                }
+            };
+            if (body) options.body = JSON.stringify(body);
+
+            const response = await fetch(`${BASE_URL}${endpoint}`, options);
+            const data = await response.json();
+
+            output.textContent = JSON.stringify(data, null, 2);
+            status.innerHTML = response.ok ? 
+                '<span class="status-badge success">UPLINK_STABLE</span>' : 
+                '<span class="status-badge error">ACCESS_DENIED</span>';
+        } catch (err) {
+            output.textContent = "CRITICAL_FAILURE: " + err.message;
+            status.innerHTML = '<span class="status-badge error">CONNECTION_LOST</span>';
+        }
+    }
+
+    function checkHealth() { apiCall('/health'); }
+    function checkWallets() { apiCall('/wallets'); }
+
+    async function publishData() {
+        const text = document.getElementById('textContent').value;
+        if (!text) return;
+        document.getElementById('pubBtn').disabled = true;
+        await apiCall('/publish/text?wait=true', 'POST', { text: text });
+        document.getElementById('pubBtn').disabled = false;
+    }
+</script>
+
+</body>
+</html>

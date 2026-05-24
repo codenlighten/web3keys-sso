@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Web3Keys — your BSV identity</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <script src="/vendor/bsv.bundle.js"></script>
+  <script src="/vendor/bsv-mnemonic.min.js"></script>
+</head>
+<body>
+  <main class="card" id="app">
+    <header class="brand">
+      <div class="logo">w3k</div>
+      <div>
+        <div class="brand-name">Web3Keys</div>
+        <div class="brand-tagline">Your BSV identity, signed by your fingerprint.</div>
+      </div>
+    </header>
+
+    <section id="view-empty" hidden>
+      <h1>Create your identity</h1>
+      <p class="muted">A noncustodial BSV identity, gated by your device biometric. The key never leaves this device.</p>
+      <form id="form-create" autocomplete="off">
+        <label>
+          <span>Recovery passphrase</span>
+          <input id="create-passphrase" type="password" required minlength="8" placeholder="At least 8 characters" />
+          <small class="muted">Used as a fallback if biometrics fail and to encrypt cloud backups later. Cannot be recovered.</small>
+        </label>
+        <button class="primary" type="submit">Create identity</button>
+      </form>
+      <details class="advanced">
+        <summary>I already have a mnemonic</summary>
+        <form id="form-restore">
+          <label>
+            <span>Recovery phrase (12 or 24 words)</span>
+            <textarea id="restore-mnemonic" rows="3" required placeholder="word word word ..."></textarea>
+          </label>
+          <label>
+            <span>New recovery passphrase for this device</span>
+            <input id="restore-passphrase" type="password" required minlength="8" />
+          </label>
+          <button class="secondary" type="submit">Restore</button>
+        </form>
+      </details>
+    </section>
+
+    <section id="view-mnemonic" hidden>
+      <h1>Save your recovery phrase</h1>
+      <p class="muted">Write this down somewhere safe. It's the only way to recover this identity on a new device. We can't see it and can't help you recover it.</p>
+      <pre id="mnemonic-display" class="mnemonic"></pre>
+      <label class="inline">
+        <input id="mnemonic-confirm" type="checkbox" />
+        <span>I've saved my recovery phrase.</span>
+      </label>
+      <button class="primary" id="mnemonic-continue" disabled>Continue</button>
+    </section>
+
+    <section id="view-account" hidden>
+      <h1>Signed in as</h1>
+      <div class="identity">
+        <div class="row"><span class="label">Address</span><code id="acct-address"></code></div>
+        <div class="row"><span class="label">Public key</span><code id="acct-pubkey"></code></div>
+        <div class="row"><span class="label">Biometric</span><span id="acct-biometric" class="pill"></span></div>
+      </div>
+
+      <h2>Sign a message</h2>
+      <form id="form-sign">
+        <textarea id="sign-message" rows="3" placeholder="Anything you want to sign…" required></textarea>
+        <div class="actions">
+          <button class="primary" type="submit">Sign</button>
+          <label class="inline">
+            <input id="use-password" type="checkbox" />
+            <span>Use password instead of biometric</span>
+          </label>
+        </div>
+      </form>
+
+      <div id="sign-result" hidden>
+        <h3>Signature</h3>
+        <pre id="sign-signature" class="signature"></pre>
+        <div class="row"><span class="label">Verified</span><span id="sign-verified" class="pill"></span></div>
+      </div>
+
+      <footer class="account-footer">
+        <button class="ghost" id="btn-signout">Sign out</button>
+        <button class="ghost danger" id="btn-reset">Erase this device</button>
+      </footer>
+    </section>
+
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+  </main>
+
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>
