@@ -20,6 +20,9 @@
 
 export const CONTEXT = 'https://web3keys.com/contexts/v1';
 export const SIG_ALG = 'ECDSA-SHA256-secp256k1';
+export const DISCLOSURE = 'salt-sha256-v1';
+export const KIND_PACKAGE = 'web3keys:claim-package';
+export const KIND_PRESENTATION = 'web3keys:presentation';
 
 export function canonicalize(value) {
   if (value === null) return 'null';
@@ -95,6 +98,123 @@ export async function verifyAttestation(attestation, bsv) {
   } catch (e) {
     return { verified: false, reason: 'parse_error', error: e?.message };
   }
+}
+
+// ---- Selective disclosure (salt-commit) ----
+
+// Commit a field value: SHA-256 of canonical-JSON({ s: salt, v: value }).
+// The wrapping object ensures salt and value can't collide with each other and
+// makes the digest invariant to representational quirks.
+export async function commitField(salt, value) {
+  const canon = canonicalize({ s: salt, v: value });
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canon));
+  return bytesToHex(new Uint8Array(buf));
+}
+
+function randomSaltHex(n = 32) {
+  return bytesToHex(crypto.getRandomValues(new Uint8Array(n)));
+}
+
+// Build an SD attestation. Returns { unsigned, openings }.
+// - unsigned.claimCommitments: { fieldKey: hex } — signed by issuer
+// - unsigned.claimSchema:     [fieldKey, ...] sorted — predictable iteration
+// - openings: { fieldKey: { salt, value } } — kept locally, given to subject
+//   out of band as part of a claim-package.
+export async function buildSdAttestation({
+  type, claimType, subject, issuer, claim, expiresAt,
+}) {
+  if (!subject?.pubKey) throw new Error('subject.pubKey is required');
+  if (!issuer?.pubKey)  throw new Error('issuer.pubKey is required');
+  if (!claimType)       throw new Error('claimType is required');
+  if (!claim || typeof claim !== 'object') throw new Error('claim payload is required');
+
+  const keys = Object.keys(claim).filter((k) => claim[k] !== undefined).sort();
+  if (keys.length === 0) throw new Error('claim must have at least one field');
+
+  const openings = {};
+  const claimCommitments = {};
+  for (const k of keys) {
+    const salt = randomSaltHex(32);
+    openings[k] = { salt, value: claim[k] };
+    claimCommitments[k] = await commitField(salt, claim[k]);
+  }
+
+  const unsigned = {
+    v: 1,
+    id: crypto.randomUUID(),
+    context: CONTEXT,
+    type: type || (subject.pubKey === issuer.pubKey ? 'selfclaim' : 'endorsement'),
+    claimType,
+    subject,
+    issuer,
+    claimSchema: keys,
+    claimCommitments,
+    disclosure: DISCLOSURE,
+    issuedAt: new Date().toISOString(),
+    ...(expiresAt ? { expiresAt } : {}),
+  };
+  return { unsigned, openings };
+}
+
+// Verify disclosed (salt, value) pairs against an attestation's commitments.
+// Returns { ok, results: { fieldKey: { ok, value? } } }.
+export async function verifyDisclosures(attestation, disclosures) {
+  if (!attestation || attestation.disclosure !== DISCLOSURE) {
+    return { ok: false, reason: 'unknown_or_missing_disclosure_scheme' };
+  }
+  const commits = attestation.claimCommitments || {};
+  const results = {};
+  let allOk = true;
+  for (const [k, opening] of Object.entries(disclosures || {})) {
+    const expected = commits[k];
+    if (!expected || !opening || typeof opening.salt !== 'string' || !('value' in opening)) {
+      results[k] = { ok: false, reason: 'malformed_or_unknown_field' };
+      allOk = false; continue;
+    }
+    const actual = await commitField(opening.salt, opening.value);
+    const ok = actual === expected;
+    results[k] = { ok, value: opening.value };
+    if (!ok) allOk = false;
+  }
+  return { ok: allOk, results };
+}
+
+// Build a presentation = signed attestation + a subset of openings.
+// `fieldsToReveal` is an array of field keys present in `openings`.
+export function buildPresentation({ attestation, openings, fieldsToReveal, audience, presenter }) {
+  const disclosures = {};
+  for (const k of fieldsToReveal || []) {
+    if (openings && openings[k]) disclosures[k] = openings[k];
+  }
+  return {
+    kind: KIND_PRESENTATION,
+    v: 1,
+    presentedAt: new Date().toISOString(),
+    audience: audience || null,
+    presenter: presenter || null,
+    attestation,
+    disclosures,
+  };
+}
+
+// Build a hand-off package = signed attestation + all openings.
+// The issuer sends this to the subject when issuing an SD claim.
+export function buildClaimPackage({ attestation, openings }) {
+  return {
+    kind: KIND_PACKAGE,
+    v: 1,
+    attestation,
+    openings: openings || {},
+  };
+}
+
+// Identify what kind of JSON the user pasted.
+export function detectShape(parsed) {
+  if (!parsed || typeof parsed !== 'object') return 'unknown';
+  if (parsed.kind === KIND_PACKAGE && parsed.attestation) return 'package';
+  if (parsed.kind === KIND_PRESENTATION && parsed.attestation) return 'presentation';
+  if (parsed.signature?.value && (parsed.claim || parsed.claimCommitments)) return 'attestation';
+  return 'unknown';
 }
 
 // Built-in claim types and how to display them. Each entry exposes its fields,

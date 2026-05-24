@@ -338,6 +338,10 @@
             <span>Expires (optional)</span>
             <input id="claim-expires" type="date" />
           </label>
+          <label class="inline">
+            <input id="claim-sd" type="checkbox" />
+            <span>Selective disclosure — let the holder reveal individual fields later instead of all at once.</span>
+          </label>
           <button class="primary" type="submit" id="claim-submit">Sign claim</button>
         </form>
 
@@ -354,8 +358,8 @@
         </form>
 
         <div id="claim-output" hidden class="result">
-          <h3>Signed claim</h3>
-          <p class="muted">Copy this JSON and send it to the subject. They can paste it into "Import a claim" to save it on their own Web3Keys.</p>
+          <h3 id="claim-output-title">Signed claim</h3>
+          <p class="muted" id="claim-output-desc">Copy this JSON and send it to the subject. They can paste it into "Import a claim" to save it on their own Web3Keys.</p>
           <pre id="claim-output-json" class="signature"></pre>
           <div class="welcome-cta">
             <button class="secondary" type="button" id="claim-output-copy">Copy</button>

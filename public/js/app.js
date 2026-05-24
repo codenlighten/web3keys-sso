@@ -19,7 +19,11 @@ import {
 } from './sign.js';
 import { setIdenticon, identiconSvg } from './identicon.js';
 import { isValidHandle, checkHandleAvailable, buildClaimMessage, claimHandle, resolveSubject } from './profile.js';
-import { buildAttestation, CLAIM_TYPES, verifyAttestation } from './attestations.js';
+import {
+  buildAttestation, CLAIM_TYPES, verifyAttestation,
+  buildSdAttestation, buildClaimPackage, buildPresentation,
+  detectShape, verifyDisclosures, DISCLOSURE,
+} from './attestations.js';
 import { attachChooser } from './chooser.js';
 import {
   buildBackupPlaintext, encryptBackup,
@@ -701,14 +705,18 @@ function renderClaimCard(c, idx, direction, vault) {
   if (direction === 'issued') directionBadge = `<span class="claim-card-direction">→ about ${escapeText(subjectLabel)}</span>`;
   else if (direction === 'received') directionBadge = `<span class="claim-card-direction">← from ${escapeText(issuerLabel)}</span>`;
 
+  const hasOpenings = c._openings && Object.keys(c._openings).length > 0;
+  const sdBadge = c.disclosure ? '<span class="claim-card-direction" style="margin-left:6px">SD</span>' : '';
+
   card.innerHTML = `
     <div class="claim-card-head">
-      <span class="claim-card-type">${escapeText(label)}</span>
+      <span class="claim-card-type">${escapeText(label)}${sdBadge}</span>
       <span class="claim-card-id">${c.id.slice(0, 8)}…</span>
     </div>
-    <div class="claim-card-summary">${summary ? escapeText(summary) : '<span class="muted">(no preview)</span>'}</div>
+    <div class="claim-card-summary">${summary ? escapeText(summary) : (c.claimCommitments ? '<span class="muted">(hidden — selectively disclosable)</span>' : '<span class="muted">(no preview)</span>')}</div>
     ${directionBadge ? `<div class="claim-card-meta">${directionBadge}</div>` : ''}
     <div class="claim-card-actions">
+      ${hasOpenings ? `<button class="primary" data-act="present" data-idx="${idx}">Present…</button>` : ''}
       <button class="ghost" data-act="copy" data-idx="${idx}">Copy JSON</button>
       <button class="ghost" data-act="verify" data-idx="${idx}">Verify</button>
       <button class="ghost danger" data-act="delete" data-idx="${idx}">Delete</button>
@@ -796,42 +804,58 @@ function attachSubjectResolution() {
   });
 }
 
-async function signAndStoreClaim({ vault, claim, type, subject, direction, expiresAt }) {
-  const unsigned = buildAttestation({
-    claimType: type,
-    subject,
-    issuer: {
-      pubKey: vault.pubKey, address: vault.address,
-      ...(vault.handle ? { handle: vault.handle } : {}),
-    },
-    claim,
-    expiresAt,
-  });
+async function signAndStoreClaim({ vault, claim, type, subject, direction, expiresAt, selectiveDisclosure }) {
+  const issuer = {
+    pubKey: vault.pubKey, address: vault.address,
+    ...(vault.handle ? { handle: vault.handle } : {}),
+  };
+
+  let unsigned, openings = null;
+  if (selectiveDisclosure) {
+    const built = await buildSdAttestation({
+      claimType: type, subject, issuer, claim, expiresAt,
+    });
+    unsigned = built.unsigned;
+    openings = built.openings;
+  } else {
+    unsigned = buildAttestation({ claimType: type, subject, issuer, claim, expiresAt });
+  }
+
   const def = CLAIM_TYPES[type];
   let summary = '';
   try { summary = def.summary(claim); } catch {}
   const aboutLabel = subject.handle ? `@${subject.handle}` :
     (subject.pubKey === vault.pubKey ? (vault.handle ? `@${vault.handle} (you)` : 'you') : subject.pubKey);
 
+  const sdNote = selectiveDisclosure
+    ? 'Signed attestation will contain only hash commitments of each field. The holder can reveal any subset later.'
+    : null;
+
   const consent = await requestConsent({
-    kind: 'attestation',
-    title: direction === 'issued' ? `Issue claim about ${aboutLabel}` : `Sign self-claim: ${def.label}`,
+    kind: selectiveDisclosure ? 'attestation-sd' : 'attestation',
+    title: direction === 'issued'
+      ? `Issue ${selectiveDisclosure ? 'SD ' : ''}claim about ${aboutLabel}`
+      : `Sign ${selectiveDisclosure ? 'SD ' : ''}self-claim: ${def.label}`,
     risk: direction === 'issued' ? 'normal' : 'low',
     summary: [
       { label: 'About', value: aboutLabel, mono: !subject.handle && subject.pubKey !== vault.pubKey },
       { label: 'Claim type', value: def.label },
       { label: 'Detail', value: summary || '(custom payload)' },
       { label: 'Issued by', value: vault.handle ? `@${vault.handle} (you)` : 'you' },
+      { label: 'Mode', value: selectiveDisclosure ? 'Selective disclosure' : 'Full disclosure' },
       ...(expiresAt ? [{ label: 'Expires', value: expiresAt.slice(0, 10) }] : []),
     ],
     detail: JSON.stringify({ ...unsigned }, null, 2),
-    warning: direction === 'issued' ? 'This claim says something about someone else over your signature. Make sure it is true and that you want the subject to be able to present it.' : null,
+    warning: direction === 'issued'
+      ? 'This claim says something about someone else over your signature. Make sure it is true and that you want the subject to be able to present it.'
+      : sdNote,
     biometricAvailable: biometricAvailable(vault),
   });
   if (!consent.approved) return null;
 
   const signed = await signAttestation(vault, consent, unsigned);
   signed.direction = direction;
+  if (openings) signed._openings = openings;
   vault.claims = vault.claims || [];
   vault.claims.unshift(signed);
   await putVault(vault);
@@ -854,6 +878,7 @@ function wireClaims() {
     if (!vault) return;
     const type = $('#claim-type').value;
     const expires = $('#claim-expires').value;
+    const selectiveDisclosure = $('#claim-sd').checked;
 
     let subject; let direction;
     if (claimMode === 'other') {
@@ -873,7 +898,7 @@ function wireClaims() {
 
     try {
       status('Signing claim…');
-      const signed = await signAndStoreClaim({ vault, claim, type, subject, direction, expiresAt });
+      const signed = await signAndStoreClaim({ vault, claim, type, subject, direction, expiresAt, selectiveDisclosure });
       if (!signed) { status('Cancelled.'); return; }
       invalidateVault();
       const fresh = await activeVault();
@@ -881,14 +906,32 @@ function wireClaims() {
       $('#form-claim').reset();
       $('#claim-fields').innerHTML = '';
 
+      // For SD third-party claims, the subject needs both attestation + openings.
+      // Hand them off as a claim-package.
       if (direction === 'issued') {
-        // Show the JSON so the issuer can hand it to the subject.
-        $('#claim-output-json').textContent = JSON.stringify(signed, null, 2);
+        const publicAttestation = { ...signed };
+        delete publicAttestation._openings;
+        delete publicAttestation.direction;
+        const output = selectiveDisclosure
+          ? buildClaimPackage({ attestation: publicAttestation, openings: signed._openings || {} })
+          : publicAttestation;
+        $('#claim-output-title').textContent = selectiveDisclosure ? 'Signed claim package' : 'Signed claim';
+        $('#claim-output-desc').textContent = selectiveDisclosure
+          ? 'This package contains the signed commitments + the openings the subject needs to present any field later. Send the whole JSON to the subject privately.'
+          : 'Copy this JSON and send it to the subject. They can paste it into "Import a claim" to save it.';
+        $('#claim-output-json').textContent = JSON.stringify(output, null, 2);
         $('#claim-output').hidden = false;
-        status(`Claim signed. Copy the JSON and send it to ${subject.handle ? '@' + subject.handle : 'them'}.`, 'ok');
+        // After issuing for someone else, we should NOT keep their openings locally.
+        if (selectiveDisclosure) {
+          delete signed._openings;
+          await putVault(fresh);
+          invalidateVault();
+        }
+        status(`Claim signed. Copy and send it to ${subject.handle ? '@' + subject.handle : 'them'}.`, 'ok');
       } else {
-        status('Self-claim signed.', 'ok');
+        status(selectiveDisclosure ? 'Self-claim signed with selective disclosure.' : 'Self-claim signed.', 'ok');
       }
+      $('#claim-sd').checked = false;
     } catch (err) {
       console.error(err); status(err.message || String(err), 'error');
     }
@@ -910,35 +953,56 @@ function wireClaims() {
     let parsed;
     try { parsed = JSON.parse(text); }
     catch { status('Not valid JSON.', 'error'); return; }
+
+    const shape = detectShape(parsed);
+    if (shape === 'unknown') { status('Unrecognized JSON shape — expected an attestation or claim-package.', 'error'); return; }
+    if (shape === 'presentation') { status('That is a presentation. Use /verify to inspect presentations.', 'warn'); return; }
+
+    const attestation = shape === 'package' ? parsed.attestation : parsed;
+    const openings = shape === 'package' ? parsed.openings : null;
+
     const bsv = bsvLib();
-    const result = await verifyAttestation(parsed, bsv);
+    const result = await verifyAttestation(attestation, bsv);
     if (!result.verified) { status(`Signature did not verify: ${result.reason}`, 'error'); return; }
 
     const vault = await activeVault();
     if (!vault) return;
-    if (parsed.subject?.pubKey !== vault.pubKey) {
+    if (attestation.subject?.pubKey !== vault.pubKey) {
       const accept = confirm(`This claim's subject is not the active identity (${vault.handle ? '@' + vault.handle : vault.pubKey.slice(0, 12) + '…'}). Save it anyway?`);
       if (!accept) return;
     }
-    if (parsed.issuer?.pubKey === vault.pubKey) {
-      // The user is importing something they signed themselves — already self-claim semantics.
-    }
-    parsed.direction = parsed.issuer?.pubKey === vault.pubKey ? (parsed.subject?.pubKey === vault.pubKey ? 'selfclaim' : 'issued') : 'received';
 
-    // De-dupe by id.
+    // If this is an SD claim, sanity-check that all disclosed openings actually
+    // verify against the signed commitments before we store them. Surfacing a
+    // bad opening here is much friendlier than at presentation time.
+    if (openings && attestation.disclosure === DISCLOSURE) {
+      const check = await verifyDisclosures(attestation, openings);
+      if (!check.ok) {
+        const bad = Object.entries(check.results).filter(([, r]) => !r.ok).map(([k]) => k).join(', ');
+        status(`Package was tampered with — openings do not match commitments (${bad}).`, 'error');
+        return;
+      }
+    }
+
+    attestation.direction = attestation.issuer?.pubKey === vault.pubKey
+      ? (attestation.subject?.pubKey === vault.pubKey ? 'selfclaim' : 'issued')
+      : 'received';
+    if (openings) attestation._openings = openings;
+
     vault.claims = vault.claims || [];
-    if (vault.claims.find((c) => c.id === parsed.id)) {
+    if (vault.claims.find((c) => c.id === attestation.id)) {
       status('This claim is already in your wallet.', 'warn');
       return;
     }
-    vault.claims.unshift(parsed);
+    vault.claims.unshift(attestation);
     await putVault(vault);
     invalidateVault();
     const fresh = await activeVault();
     renderClaims(fresh);
     $('#claim-import-json').value = '';
     setClaimMode('self');
-    status(result.expired ? 'Claim saved (already expired).' : 'Claim verified and saved.', result.expired ? 'warn' : 'ok');
+    const sdSuffix = openings ? ' (selective disclosure ready)' : '';
+    status(result.expired ? `Claim saved${sdSuffix} (already expired).` : `Claim verified and saved${sdSuffix}.`, result.expired ? 'warn' : 'ok');
   });
 
   $('#claim-import-clear').addEventListener('click', () => { $('#claim-import-json').value = ''; });
@@ -952,7 +1016,13 @@ function wireClaims() {
     const c = vault.claims[idx];
 
     if (btn.dataset.act === 'copy') {
-      await navigator.clipboard.writeText(JSON.stringify(c, null, 2));
+      // Strip private openings from copied JSON — those are NOT part of the
+      // public attestation. SD claims should be shared as packages or
+      // presentations, not as the raw stored object.
+      const out = { ...c };
+      delete out._openings;
+      delete out.direction;
+      await navigator.clipboard.writeText(JSON.stringify(out, null, 2));
       status('Claim JSON copied.', 'ok');
     } else if (btn.dataset.act === 'verify') {
       const r = await verifyAttestation(c, bsvLib());
@@ -965,8 +1035,98 @@ function wireClaims() {
       const fresh = await activeVault();
       renderClaims(fresh);
       status('Claim deleted.', 'ok');
+    } else if (btn.dataset.act === 'present') {
+      await openPresentModal(c, vault);
     }
   });
+}
+
+// ---- Present modal (selective disclosure) ----
+function openPresentModal(claim, vault) {
+  return new Promise((resolve) => {
+    const root = document.body;
+    const backdrop = document.createElement('div');
+    backdrop.className = 'consent-backdrop';
+
+    const fields = (claim.claimSchema || Object.keys(claim._openings || {})).slice();
+    const openings = claim._openings || {};
+
+    function close(result) {
+      backdrop.remove();
+      document.removeEventListener('keydown', onKey);
+      resolve(result);
+    }
+    function onKey(e) { if (e.key === 'Escape') close(null); }
+    document.addEventListener('keydown', onKey);
+
+    const fieldsHtml = fields.map((k) => `
+      <label class="inline" style="justify-content:space-between;gap:0.5rem">
+        <span style="display:flex;align-items:center;gap:0.5rem">
+          <input type="checkbox" data-field="${escapeText(k)}" checked />
+          <strong>${escapeText(k)}</strong>
+        </span>
+        <code style="font-size:0.75rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeText(formatPresetValue(openings[k]?.value))}</code>
+      </label>
+    `).join('');
+
+    const def = CLAIM_TYPES[claim.claimType];
+    backdrop.innerHTML = `
+      <div class="consent-card" role="dialog" aria-modal="true">
+        <header class="consent-header">
+          <div class="consent-kind">presentation</div>
+          <span class="pill" data-kind="info">Selective</span>
+        </header>
+        <h2 class="consent-title">Present ${escapeText(def?.label || claim.claimType)}</h2>
+        <div class="consent-requester">
+          <span class="label">Issuer</span>
+          <span>${claim.issuer?.handle ? '@' + escapeText(claim.issuer.handle) : escapeText(claim.issuer?.pubKey?.slice(0, 12) + '…')}</span>
+        </div>
+        <p class="muted small">Choose which fields to reveal. Hidden fields stay as commitments only — the verifier can confirm the claim was signed, but can't see what they say.</p>
+        <div class="consent-summary" style="padding:0.5rem 0.75rem;display:flex;flex-direction:column;gap:0.5rem">${fieldsHtml}</div>
+        <label>
+          <span>Audience (optional)</span>
+          <input type="text" id="present-audience" placeholder="e.g. recruiter.example.com" autocomplete="off" />
+        </label>
+        <div class="consent-actions">
+          <button class="ghost" type="button" data-pa="cancel">Cancel</button>
+          <button class="primary" type="button" data-pa="ok">Generate presentation</button>
+        </div>
+      </div>
+    `;
+    root.append(backdrop);
+
+    backdrop.querySelector('[data-pa="cancel"]').addEventListener('click', () => close(null));
+    backdrop.querySelector('[data-pa="ok"]').addEventListener('click', () => {
+      const checks = backdrop.querySelectorAll('input[type=checkbox][data-field]');
+      const fieldsToReveal = Array.from(checks).filter((c) => c.checked).map((c) => c.dataset.field);
+      const audience = backdrop.querySelector('#present-audience').value.trim() || null;
+      const publicAttestation = { ...claim };
+      delete publicAttestation._openings;
+      delete publicAttestation.direction;
+      const presentation = buildPresentation({
+        attestation: publicAttestation,
+        openings,
+        fieldsToReveal,
+        audience,
+        presenter: { pubKey: vault.pubKey, ...(vault.handle ? { handle: vault.handle } : {}) },
+      });
+      $('#claim-output-title').textContent = 'Presentation';
+      $('#claim-output-desc').textContent = audience
+        ? `Send this to ${audience}. They paste it into /verify; revealed fields show as values, hidden fields show as "(undisclosed)".`
+        : 'Send this to your verifier. They paste it into /verify; revealed fields show as values, hidden fields show as "(undisclosed)".';
+      $('#claim-output-json').textContent = JSON.stringify(presentation, null, 2);
+      $('#claim-output').hidden = false;
+      $('#claim-output').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      close(presentation);
+      status(`Generated presentation revealing ${fieldsToReveal.length} of ${fields.length} fields.`, 'ok');
+    });
+  });
+}
+
+function formatPresetValue(v) {
+  if (v == null) return '—';
+  if (typeof v === 'string') return v.length > 32 ? v.slice(0, 32) + '…' : v;
+  try { return JSON.stringify(v).slice(0, 32); } catch { return String(v); }
 }
 
 // ---- Transaction ----
