@@ -29,6 +29,7 @@ import {
   buildBackupPlaintext, encryptBackup,
   saveBackup, requestRetrieve, deleteBackup, buildDeleteMessage,
 } from './backup.js';
+import { status } from './status.js';
 
 const WELCOMED_KEY = 'web3keys:welcomed';
 let createMode = 'first'; // 'first' | 'add'
@@ -38,11 +39,6 @@ const INFO_WIF = 'web3keys/v1/wif-wrap';
 const INFO_MNEMONIC = 'web3keys/v1/mnemonic-wrap';
 
 const $ = (sel) => document.querySelector(sel);
-const status = (msg, kind = 'info') => {
-  const el = $('#status');
-  el.textContent = msg || '';
-  el.dataset.kind = kind;
-};
 const showView = (id) => {
   for (const s of document.querySelectorAll('main > section')) s.hidden = true;
   $(id).hidden = false;

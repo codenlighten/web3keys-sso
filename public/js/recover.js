@@ -5,13 +5,13 @@ import {
 } from './biometric.js';
 import { putVault } from './vault.js';
 import { inspectToken, consumeToken, decryptBackup } from './backup.js';
+import { status } from './status.js';
 
 const IDENTITY_PATH = "m/44'/236'/0'/0/0";
 const INFO_WIF = 'web3keys/v1/wif-wrap';
 const INFO_MNEMONIC = 'web3keys/v1/mnemonic-wrap';
 
 const $ = (s) => document.querySelector(s);
-const status = (m, k = 'info') => { const e = $('#status'); e.textContent = m || ''; e.dataset.kind = k; };
 
 function bsvLib() {
   const lib = window.bsv;

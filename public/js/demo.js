@@ -2,9 +2,10 @@
 // In a real dApp, verification should also happen server-side. This page
 // runs the same logic client-side using the bsv library for illustration.
 
+import { status } from './status.js';
+
 const CLIENT_ID = 'demo.web3keys.com';
 const $ = (s) => document.querySelector(s);
-const status = (m, k = 'info') => { const e = $('#status'); e.textContent = m || ''; e.dataset.kind = k; };
 
 function fmtTime(unix) {
   const d = new Date(unix * 1000);

@@ -2,9 +2,9 @@ import {
   verifyAttestation, digestHex, CLAIM_TYPES,
   detectShape, verifyDisclosures, DISCLOSURE,
 } from './attestations.js';
+import { status } from './status.js';
 
 const $ = (s) => document.querySelector(s);
-const status = (m, k = 'info') => { const el = $('#status'); el.textContent = m || ''; el.dataset.kind = k; };
 
 function row(label, value, mono = false) {
   const r = document.createElement('div');

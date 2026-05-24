@@ -2,6 +2,7 @@ import { listVaults } from './vault.js';
 import { requestConsent } from './consent.js';
 import { signHash } from './sign.js';
 import { identiconSvg } from './identicon.js';
+import { status } from './status.js';
 
 const params = new URLSearchParams(location.search);
 const CLIENT_ID = params.get('client_id') || 'unknown';
@@ -18,7 +19,6 @@ const TOKEN_TYP = 'WEB3KEYS';
 const TOKEN_VERSION = 1;
 
 const $ = (s) => document.querySelector(s);
-const status = (m, k = 'info') => { const el = $('#status'); el.textContent = m || ''; el.dataset.kind = k; };
 
 function bytesToBase64Url(bytes) {
   let bin = '';
