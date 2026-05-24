@@ -87,7 +87,7 @@ export function renderNotFoundPage(handle) {
     <a class="profile-back" href="/">← Web3Keys</a>
     <h1>@${h} is unclaimed</h1>
     <p class="muted">No one has claimed this handle on Web3Keys yet. Want it?</p>
-    <a class="primary button-link" href="/">Claim a handle →</a>
+    <a class="primary button-link" href="/app">Claim a handle →</a>
   </main>
 </body>
 </html>`;

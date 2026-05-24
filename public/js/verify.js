@@ -237,7 +237,7 @@ function addImportButton(details, parsed, verified) {
   importBox.style.marginTop = '1rem';
   const importBtn = document.createElement('a');
   importBtn.className = 'primary button-link';
-  importBtn.href = `/?import=${b64urlEncode(JSON.stringify(parsed))}`;
+  importBtn.href = `/app?import=${b64urlEncode(JSON.stringify(parsed))}`;
   importBtn.textContent = 'Add to my Web3Keys wallet →';
   importBox.append(importBtn);
   details.append(importBox);

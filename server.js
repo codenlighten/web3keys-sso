@@ -246,6 +246,8 @@ app.get('/verify',  (_req, res) => res.sendFile(path.join(__dirname, 'public', '
 app.get('/sso',     (_req, res) => res.sendFile(path.join(__dirname, 'public', 'sso.html')));
 app.get('/demo',    (_req, res) => res.sendFile(path.join(__dirname, 'public', 'demo.html')));
 app.get('/recover', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'recover.html')));
+app.get('/app',     (_req, res) => res.sendFile(path.join(__dirname, 'public', 'app.html')));
+app.get('/',        (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 // SDK gets a permissive Cache-Control for dApp embedding, plus explicit CORS so
 // cross-origin <script> imports work without surprises.

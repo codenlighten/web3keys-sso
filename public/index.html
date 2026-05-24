@@ -5,434 +5,270 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="theme-color" content="#0a0c10" />
   <title>Web3Keys — Your identity, signed by you</title>
-  <meta name="description" content="A noncustodial identity portal. You own the key. Sign claims about yourself, verify anyone, share what you choose." />
+  <meta name="description" content="A noncustodial identity portal for the open web. Own your handle, your credentials, and what you choose to disclose. From SmartLedger." />
   <meta property="og:title" content="Web3Keys — Your identity, signed by you" />
-  <meta property="og:description" content="A noncustodial identity portal. You own the key. Sign claims about yourself, verify anyone, share what you choose." />
+  <meta property="og:description" content="A noncustodial identity portal for the open web. Own your handle, your credentials, and what you choose to disclose. From SmartLedger." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://web3keys.com/" />
   <meta name="twitter:card" content="summary" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="stylesheet" href="/styles.css" />
-  <script src="/vendor/bsv.bundle.js"></script>
-  <script src="/vendor/bsv-mnemonic.min.js"></script>
-  <script src="/vendor/bsv-ecies.min.js"></script>
 </head>
-<body>
-  <main class="card" id="app">
-    <header class="brand">
-      <div class="logo">w3k</div>
+<body class="landing-body">
+
+  <nav class="landing-nav">
+    <a href="/" class="landing-nav-brand">
+      <span class="landing-nav-mark">w3k</span>
+      <span class="landing-nav-name">Web3Keys</span>
+    </a>
+    <div class="landing-nav-links">
+      <a href="/verify">Verify</a>
+      <a href="/demo">Demo</a>
+      <a href="https://github.com/codenlighten/web3keys-sso" target="_blank" rel="noopener">GitHub</a>
+      <a href="/app" class="primary button-link landing-nav-cta">Open wallet</a>
+    </div>
+  </nav>
+
+  <header class="landing-hero">
+    <div class="landing-hero-eyebrow">
+      <span class="pill" data-kind="info">From SmartLedger · Trust infrastructure since 2019</span>
+    </div>
+    <h1 class="landing-hero-headline">Your identity,<br/><span class="grad">signed by you.</span></h1>
+    <p class="landing-hero-sub">
+      A noncustodial identity portal for the open web. Own your handle. Sign your own credentials.
+      Collect signed attestations from others. Reveal only what's needed, to whom you choose.
+    </p>
+    <div class="landing-hero-ctas">
+      <a href="/app" class="primary button-link landing-cta">Claim your identity →</a>
+      <a href="#how" class="ghost button-link">How it works</a>
+    </div>
+    <div class="landing-hero-trust">
+      <span>· noncustodial · open source · BSV-anchored · client-side crypto ·</span>
+    </div>
+  </header>
+
+  <section class="landing-section">
+    <h2 class="landing-section-title">Today's identity is borrowed.</h2>
+    <p class="landing-section-body">
+      You sign in with Google. Your name belongs to a brand. Your credentials sit in someone else's database.
+      Every login leaks more about you than the app needs to know. If the provider changes its policy, raises its
+      price, or just disappears, you lose everything you built on top of it.
+    </p>
+    <p class="landing-section-body">
+      Web3Keys is the alternative: a portable, cryptographic identity you actually own — built on the same
+      verifiability primitives that <a href="https://smartledger.technology" target="_blank" rel="noopener">SmartLedger</a>
+      brings to enterprise and government records, packaged for individuals.
+    </p>
+  </section>
+
+  <section class="landing-section" id="pillars">
+    <h2 class="landing-section-title">Three properties. No exceptions.</h2>
+    <div class="landing-pillars">
+      <article class="landing-pillar">
+        <div class="landing-pillar-icon" aria-hidden="true">⌁</div>
+        <h3>Owned by you</h3>
+        <p>
+          Your secp256k1 signing key is generated on your device, encrypted by your biometric, and never leaves.
+          We can't see it, sell it, sign for you, or lock you in. If our server disappears, your identity still works.
+        </p>
+      </article>
+      <article class="landing-pillar">
+        <div class="landing-pillar-icon" aria-hidden="true">✓</div>
+        <h3>Verifiable claims</h3>
+        <p>
+          Sign attestations about yourself — your name, your email, your domain, content you authored.
+          Receive signed credentials from schools, employers, sponsors. Anyone, anywhere can verify them
+          with no server in the loop.
+        </p>
+      </article>
+      <article class="landing-pillar">
+        <div class="landing-pillar-icon" aria-hidden="true">⌖</div>
+        <h3>Selective disclosure</h3>
+        <p>
+          Each claim field is a salt-commit hash. Reveal any subset later without re-signing. Prove you're a verified
+          creator without revealing your real name. Prove you graduated without showing the transcript.
+        </p>
+      </article>
+    </div>
+  </section>
+
+  <section class="landing-section" id="how">
+    <h2 class="landing-section-title">How it works</h2>
+    <ol class="landing-steps">
+      <li>
+        <div class="landing-step-n">1</div>
+        <div>
+          <h3>Create</h3>
+          <p>Pick a handle like <code>@alice@web3keys.com</code>. The browser generates a BSV secp256k1 keypair
+            from a 24-word recovery phrase, then wraps it twice — once with your biometric via WebAuthn PRF,
+            once with your passphrase. Both wrapped copies live in this browser only.</p>
+        </div>
+      </li>
+      <li>
+        <div class="landing-step-n">2</div>
+        <div>
+          <h3>Claim & collect</h3>
+          <p>Sign self-claims about yourself. Hand signed claim-packages to people you want to endorse.
+            Import claim-packages others sign about you. Every claim is canonical JSON + ECDSA over a SHA-256 digest —
+            verifiable in any language, anywhere, forever.</p>
+        </div>
+      </li>
+      <li>
+        <div class="landing-step-n">3</div>
+        <div>
+          <h3>Disclose</h3>
+          <p>Build a presentation revealing only the fields you choose. Bind it to a specific audience if you want.
+            The verifier checks the issuer's signature and the disclosed commitments — without seeing the fields you held back.</p>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <section class="landing-section" id="use-cases">
+    <h2 class="landing-section-title">Built for the people who outgrew rented identity.</h2>
+    <div class="landing-use-cases">
+      <article class="landing-use-case">
+        <div class="landing-use-case-tag">Creators · NIL</div>
+        <h3>Prove what's yours.</h3>
+        <p>
+          Sign an ownership attestation against the SHA-256 of your image, song, or article — the same hash
+          every platform can compute. Carry your verified identity across YouTube, X, Twitch, and the next ten platforms
+          that haven't been built yet. Your followers can verify on <a href="/verify">/verify</a> that
+          @you signed @you's work.
+        </p>
+      </article>
+      <article class="landing-use-case">
+        <div class="landing-use-case-tag">Professionals · Credentials</div>
+        <h3>Carry your record.</h3>
+        <p>
+          Schools, employers, certifying bodies, and clients can sign attestations into your wallet. When a recruiter
+          asks for proof, you present a selectively-disclosed bundle — name, degree, dates — without exposing
+          your transcript or salary. They verify the signature against the issuer's public key, no portal login required.
+        </p>
+      </article>
+      <article class="landing-use-case">
+        <div class="landing-use-case-tag">Developers · SSO</div>
+        <h3>Replace OAuth with cryptography.</h3>
+        <p>
+          Drop <code>&lt;script src="https://web3keys.com/sdk.js"&gt;&lt;/script&gt;</code> into your app. Users tap
+          "Sign in with Web3Keys" — a popup, a biometric, a signed ID token. JWT-shaped but signed with secp256k1
+          you can verify offline. No OAuth dance, no leaky scopes, no account-recovery support tickets.
+        </p>
+      </article>
+    </div>
+  </section>
+
+  <section class="landing-section landing-developer" id="developers">
+    <div class="landing-developer-inner">
       <div>
-        <div class="brand-name">Web3Keys</div>
-        <div class="brand-tagline">Your BSV identity, signed by your fingerprint.</div>
-      </div>
-    </header>
-
-    <section id="view-welcome" hidden>
-      <div class="welcome-hero">
-        <h1>Your identity, signed by you.</h1>
-        <p class="welcome-sub">Web3Keys is a noncustodial identity portal. You own the key. We can't see it, can't sell it, can't sign for you, and can't lock you in.</p>
-      </div>
-
-      <div class="welcome-pillars">
-        <div class="pillar">
-          <div class="pillar-icon" aria-hidden="true">⌁</div>
-          <h3>Owned by you</h3>
-          <p>Your signing key is generated on this device, encrypted by your biometric, and never leaves.</p>
-        </div>
-        <div class="pillar">
-          <div class="pillar-icon" aria-hidden="true">✓</div>
-          <h3>Verifiable claims</h3>
-          <p>Sign attestations about yourself or your work. Anyone can verify them anywhere — no server needed.</p>
-        </div>
-        <div class="pillar">
-          <div class="pillar-icon" aria-hidden="true">↗</div>
-          <h3>Yours to leave</h3>
-          <p>A 24-word recovery phrase recreates your identity on any device. No lock-in, no opaque vendor.</p>
+        <span class="pill" data-kind="info">For developers</span>
+        <h2 class="landing-section-title">Three lines.</h2>
+        <p class="landing-section-body">
+          That's everything a relying party needs. The ID token's audience is bound to your <code>clientId</code>,
+          so even a hostile intermediary can't reuse it elsewhere. Verify the secp256k1 signature against the
+          public key in the token's <code>sub</code> field. Done.
+        </p>
+        <div class="landing-cta-row">
+          <a href="/demo" class="primary button-link">Try the live demo →</a>
+          <a href="https://github.com/codenlighten/web3keys-sso" target="_blank" rel="noopener" class="ghost button-link">View source on GitHub</a>
         </div>
       </div>
+      <pre class="landing-code"><span class="c-key">&lt;script</span> src=<span class="c-str">"https://web3keys.com/sdk.js"</span><span class="c-key">&gt;&lt;/script&gt;</span>
+<span class="c-key">&lt;div</span> data-web3keys-signin data-client-id=<span class="c-str">"myapp.example.com"</span><span class="c-key">&gt;&lt;/div&gt;</span>
+<span class="c-key">&lt;script&gt;</span>
+  document.addEventListener(<span class="c-str">'web3keys-signin'</span>, (e) =&gt; {
+    <span class="c-com">// e.detail.idToken — JWT-shaped, secp256k1-signed, bound to your clientId</span>
+    fetch(<span class="c-str">'/api/login'</span>, { method: <span class="c-str">'POST'</span>, body: JSON.stringify(e.detail) });
+  });
+<span class="c-key">&lt;/script&gt;</span></pre>
+    </div>
+  </section>
 
-      <details class="trust-model">
-        <summary>How exactly does this work?</summary>
-        <div class="trust-body">
-          <p><strong>The key.</strong> When you create an identity, your browser generates a Bitcoin SV secp256k1 keypair from a 24-word recovery phrase. The private key is wrapped twice — once with a 256-bit secret derived from your platform biometric (via WebAuthn PRF), once with a key derived from your recovery passphrase. Both wrapped copies are stored in this browser only.</p>
-          <p><strong>The server.</strong> Our server holds your public handle (like a phone book entry) so dApps can recognize you by name. It never sees plaintext keys, mnemonics, or passphrases. If our server disappears, your identity still works — it just won't have a public profile page.</p>
-          <p><strong>Recovery.</strong> Your 24-word phrase IS your identity. We can't see it and we can't help you recover it. Anyone who reads it can recreate you on any device. Keep it offline.</p>
-          <p><strong>Open source.</strong> Every line is on GitHub. Audit it, fork it, run your own.</p>
-          <p><a href="https://github.com/codenlighten/web3keys-sso" target="_blank" rel="noopener">Source on GitHub →</a></p>
-        </div>
-      </details>
-
-      <div class="welcome-cta">
-        <button id="btn-welcome-create" class="primary">Create your identity</button>
-        <button id="btn-welcome-restore" class="ghost">I have a recovery phrase</button>
+  <section class="landing-section landing-trust">
+    <h2 class="landing-section-title">Trust by construction.</h2>
+    <div class="landing-trust-grid">
+      <div>
+        <h3>Client-side crypto.</h3>
+        <p>Keys are generated, wrapped, and unlocked entirely in your browser. Our server never sees your
+          mnemonic, your passphrase, or your private key. Even if our database is leaked, your identity is intact.</p>
       </div>
-      <div style="margin-top:1rem;text-align:center;">
-        <a href="#" id="link-welcome-cloud" class="muted">Restore from a cloud backup →</a>
+      <div>
+        <h3>Open source.</h3>
+        <p>Every line is on GitHub. The wallet, the SDK, the server, the verifier — all of it. Fork it. Run your own.
+          Audit ours.</p>
       </div>
-    </section>
-
-    <section id="view-empty" hidden>
-      <h1 id="empty-title">Claim your identity</h1>
-      <p class="muted">A noncustodial BSV identity you fully own — paymail handle, public profile, signed attestations. The signing key never leaves this device and only your biometric unlocks it.</p>
-      <form id="form-create" autocomplete="off">
-        <label>
-          <span>Your handle</span>
-          <div class="handle-input">
-            <input id="create-handle" type="text" required pattern="[a-z0-9](?:[a-z0-9_-]{1,30}[a-z0-9])?" maxlength="32" placeholder="alice" autocomplete="off" />
-            <span class="handle-suffix">@web3keys.com</span>
-          </div>
-          <small id="handle-feedback" class="muted">3–32 lowercase letters, digits, dashes, underscores.</small>
-        </label>
-        <label>
-          <span>Display name</span>
-          <input id="create-display" type="text" required maxlength="80" placeholder="Alice Example" autocomplete="off" />
-        </label>
-        <label>
-          <span>Recovery passphrase</span>
-          <input id="create-passphrase" type="password" required minlength="8" placeholder="At least 8 characters" />
-          <small class="muted">Backup unlock if biometrics fail. Can't be recovered if you forget it — your recovery phrase still works.</small>
-        </label>
-        <button class="primary" type="submit" id="btn-create">Create identity</button>
-        <button type="button" class="ghost" id="btn-empty-back" hidden>Back</button>
-      </form>
-      <button type="button" class="ghost" id="btn-empty-cloud" style="align-self:flex-start;margin-top:0.5rem">Restore from a cloud backup instead</button>
-
-      <details class="advanced" id="restore-details">
-        <summary>I already have a recovery phrase</summary>
-        <form id="form-restore">
-          <label>
-            <span>Recovery phrase (12 or 24 words)</span>
-            <textarea id="restore-mnemonic" rows="3" required placeholder="word word word ..."></textarea>
-          </label>
-          <label>
-            <span>Handle on this device (optional — leave blank to skip)</span>
-            <div class="handle-input">
-              <input id="restore-handle" type="text" pattern="[a-z0-9](?:[a-z0-9_-]{1,30}[a-z0-9])?" maxlength="32" placeholder="alice" autocomplete="off" />
-              <span class="handle-suffix">@web3keys.com</span>
-            </div>
-          </label>
-          <label>
-            <span>Display name (optional)</span>
-            <input id="restore-display" type="text" maxlength="80" autocomplete="off" />
-          </label>
-          <label>
-            <span>New recovery passphrase for this device</span>
-            <input id="restore-passphrase" type="password" required minlength="8" />
-          </label>
-          <button class="secondary" type="submit">Restore</button>
-        </form>
-      </details>
-    </section>
-
-    <section id="view-cloud-request" hidden>
-      <h1>Restore from cloud backup</h1>
-      <p class="muted">Enter the email address tied to your backup. We'll send you a one-time link valid for 15 minutes. You'll still need your recovery passphrase to decrypt the backup — the server never sees it.</p>
-      <form id="form-cloud-request" autocomplete="off">
-        <label>
-          <span>Email</span>
-          <input id="cloud-request-email" type="email" required placeholder="you@example.com" autocomplete="email" />
-        </label>
-        <div class="welcome-cta">
-          <button class="primary" type="submit">Send recovery link</button>
-          <button class="ghost" type="button" id="cloud-request-back">Cancel</button>
-        </div>
-      </form>
-      <div id="cloud-request-sent" hidden class="result">
-        <p>If a backup exists for that email, a recovery link is on its way. Open it on this device when you're ready.</p>
-        <button class="ghost" type="button" id="cloud-request-done">Done</button>
+      <div>
+        <h3>Built on SmartLedger.</h3>
+        <p><a href="https://smartledger.technology" target="_blank" rel="noopener">SmartLedger</a> has been
+          building auditable, trust-infrastructure systems for enterprise and government since 2019 — notarization,
+          provenance, accountable AI. Web3Keys is the same DNA, scaled to individuals.</p>
       </div>
-    </section>
-
-    <section id="view-mnemonic" hidden>
-      <h1>Your recovery phrase</h1>
-      <p class="muted">24 words that <em>are</em> your identity. Write them down on paper and keep them somewhere only you can find. We can't see them and we can't help you recover them.</p>
-      <div id="mnemonic-grid" class="mnemonic-grid"></div>
-      <div class="mnemonic-actions">
-        <button class="ghost" type="button" id="btn-mnemonic-copy">Copy to clipboard</button>
+      <div>
+        <h3>No vendor lock.</h3>
+        <p>Your 24-word recovery phrase recreates this identity on any device, with or without our service.
+          Export it, take it elsewhere, sleep easy.</p>
       </div>
-      <label class="inline mnemonic-confirm">
-        <input id="mnemonic-confirm" type="checkbox" />
-        <span>I've written these 24 words down somewhere safe.</span>
-      </label>
-      <button class="primary" id="mnemonic-continue" disabled>Continue</button>
-    </section>
+    </div>
+  </section>
 
-    <section id="view-account" hidden>
-      <div class="profile-header-wrap">
-        <div class="profile-header">
-          <button type="button" class="profile-header-main" id="acct-switcher" aria-haspopup="true" aria-expanded="false">
-            <div class="profile-header-avatar" id="acct-avatar"></div>
-            <div class="profile-header-text">
-              <div class="profile-header-name" id="acct-display">—</div>
-              <div class="profile-header-handle">
-                <span id="acct-handle-prefix">—</span><span class="muted">@web3keys.com</span>
-              </div>
-            </div>
-            <div class="profile-header-chev" aria-hidden="true">⌄</div>
-          </button>
-          <div class="profile-header-meta">
-            <span id="acct-biometric" class="pill">—</span>
-            <a id="acct-profile-link" class="profile-link" href="#" target="_blank" hidden>view ↗</a>
-          </div>
-        </div>
-        <div id="chooser" class="chooser" hidden role="menu"></div>
-      </div>
+  <section class="landing-section landing-finalcta">
+    <h2 class="landing-section-title">Claim your identity.</h2>
+    <p class="landing-section-body landing-finalcta-sub">
+      Free. Noncustodial. About thirty seconds.
+    </p>
+    <a href="/app" class="primary button-link landing-cta">Get started →</a>
+  </section>
 
-      <details class="account-details">
-        <summary>Identity details</summary>
-        <div class="row"><span class="label">Public key</span><code id="acct-pubkey"></code></div>
-        <div class="row"><span class="label">BSV address</span><code id="acct-address"></code></div>
-      </details>
-
-      <div id="acct-claim-handle" hidden>
-        <div class="consent-warning small">You don't have a public handle yet on this device. Claim one to get a public profile and let dApps recognize you by name.</div>
-        <form id="form-claim-handle">
-          <label>
-            <span>Pick a handle</span>
-            <div class="handle-input">
-              <input id="latehandle-input" type="text" pattern="[a-z0-9](?:[a-z0-9_-]{1,30}[a-z0-9])?" maxlength="32" required />
-              <span class="handle-suffix">@web3keys.com</span>
-            </div>
-            <small id="latehandle-feedback" class="muted">3–32 lowercase letters, digits, dashes, underscores.</small>
-          </label>
-          <label>
-            <span>Display name</span>
-            <input id="latehandle-display" type="text" maxlength="80" required />
-          </label>
-          <button class="primary" type="submit">Claim handle</button>
-        </form>
-      </div>
-
-      <nav class="tabs" role="tablist">
-        <button class="tab" role="tab" data-tab="message" aria-selected="true">Message</button>
-        <button class="tab" role="tab" data-tab="claims">Claims</button>
-        <button class="tab" role="tab" data-tab="transaction">Transaction</button>
-        <button class="tab" role="tab" data-tab="hash">Hash</button>
-        <button class="tab" role="tab" data-tab="ecies">Encrypt / Decrypt</button>
-        <button class="tab" role="tab" data-tab="settings">Settings</button>
-      </nav>
-
-      <div class="tab-panel" data-panel="message">
-        <form id="form-message">
-          <label>
-            <span>Message</span>
-            <textarea id="msg-text" rows="3" placeholder="Anything you want to sign…" required></textarea>
-          </label>
-          <button class="primary" type="submit">Sign message</button>
-        </form>
-        <div class="result" id="msg-result" hidden>
-          <h3>Signature</h3>
-          <pre id="msg-signature" class="signature"></pre>
-          <div class="row"><span class="label">Verified</span><span id="msg-verified" class="pill"></span></div>
+  <footer class="landing-footer">
+    <div class="landing-footer-inner">
+      <div class="landing-footer-brand">
+        <span class="landing-nav-mark">w3k</span>
+        <div>
+          <div class="brand-name">Web3Keys</div>
+          <div class="muted small">A <a href="https://smartledger.technology" target="_blank" rel="noopener">SmartLedger</a> product · est. 2019 · Wilmington, DE</div>
         </div>
       </div>
-
-      <div class="tab-panel" data-panel="transaction" hidden>
-        <form id="form-tx">
-          <label>
-            <span>Raw transaction (hex)</span>
-            <textarea id="tx-raw" rows="4" placeholder="0100000001..." required></textarea>
-          </label>
-          <label>
-            <span>UTXO context (JSON)</span>
-            <textarea id="tx-utxo" rows="4" placeholder='[{"index":0,"scriptPubKey":"76a914...88ac","satoshis":1000}]'></textarea>
-            <small class="muted">Required so the wallet can compute sighash and show the fee. One entry per input you want signed.</small>
-          </label>
-          <div class="actions">
-            <button class="ghost" type="button" id="btn-tx-preview">Preview</button>
-            <button class="primary" type="submit">Sign transaction</button>
-          </div>
-        </form>
-        <div class="result" id="tx-result" hidden>
-          <h3>Signed transaction</h3>
-          <div class="row"><span class="label">TXID</span><code id="tx-txid"></code></div>
-          <pre id="tx-rawsigned" class="signature"></pre>
+      <div class="landing-footer-cols">
+        <div>
+          <div class="landing-footer-col-title">Product</div>
+          <a href="/app">Wallet</a>
+          <a href="/verify">Verify</a>
+          <a href="/demo">SSO demo</a>
+          <a href="/sdk.js">SDK</a>
+        </div>
+        <div>
+          <div class="landing-footer-col-title">Code</div>
+          <a href="https://github.com/codenlighten/web3keys-sso" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://github.com/codenlighten/web3keys-sso/issues" target="_blank" rel="noopener">Issues</a>
+        </div>
+        <div>
+          <div class="landing-footer-col-title">SmartLedger</div>
+          <a href="https://smartledger.technology" target="_blank" rel="noopener">smartledger.technology</a>
+          <span class="muted small">CAGE 10HF4 · UEI C5RUDT3WS844</span>
         </div>
       </div>
+    </div>
+  </footer>
 
-      <div class="tab-panel" data-panel="hash" hidden>
-        <div class="consent-warning small">Hash signing produces a signature over an opaque 32-byte digest. The wallet cannot tell you what the digest represents — only sign hashes from sources you trust.</div>
-        <form id="form-hash">
-          <label>
-            <span>32-byte digest (hex)</span>
-            <input id="hash-digest" type="text" pattern="[0-9a-fA-F]{64}" maxlength="64" placeholder="64 hex characters" required />
-          </label>
-          <label>
-            <span>What does this hash represent? (shown in consent)</span>
-            <input id="hash-intent" type="text" placeholder="e.g. login challenge for example.com" required />
-          </label>
-          <button class="primary" type="submit">Sign hash</button>
-        </form>
-        <div class="result" id="hash-result" hidden>
-          <h3>Signature (DER)</h3>
-          <pre id="hash-derhex" class="signature"></pre>
-        </div>
-      </div>
-
-      <div class="tab-panel" data-panel="ecies" hidden>
-        <nav class="subtabs">
-          <button class="subtab" data-mode="encrypt" aria-selected="true">Encrypt</button>
-          <button class="subtab" data-mode="decrypt">Decrypt</button>
-        </nav>
-        <div class="subtab-panel" data-mode="encrypt">
-          <form id="form-encrypt">
-            <label>
-              <span>Plaintext</span>
-              <textarea id="enc-plain" rows="3" placeholder="A secret note for the recipient…" required></textarea>
-            </label>
-            <label>
-              <span>Recipient public key (hex, 33 bytes compressed)</span>
-              <input id="enc-pub" type="text" pattern="0[23][0-9a-fA-F]{64}" maxlength="66" placeholder="02ab…" required />
-            </label>
-            <button class="primary" type="submit">Encrypt</button>
-          </form>
-          <div class="result" id="enc-result" hidden>
-            <h3>Ciphertext (base64)</h3>
-            <pre id="enc-ciphertext" class="signature"></pre>
-          </div>
-        </div>
-        <div class="subtab-panel" data-mode="decrypt" hidden>
-          <form id="form-decrypt">
-            <label>
-              <span>Ciphertext (base64)</span>
-              <textarea id="dec-ct" rows="3" required></textarea>
-            </label>
-            <button class="primary" type="submit">Decrypt</button>
-          </form>
-          <div class="result" id="dec-result" hidden>
-            <h3>Plaintext</h3>
-            <pre id="dec-plain" class="signature"></pre>
-          </div>
-        </div>
-      </div>
-
-      <div class="tab-panel" data-panel="claims" hidden>
-        <p class="muted">Claims are signed statements about an identity. Sign them yourself for self-claims, sign them about others to endorse or attest, or import claims someone else signed about you. Anyone can verify any claim at <a href="/verify">/verify</a>.</p>
-
-        <nav class="subtabs" id="claim-mode-tabs">
-          <button type="button" class="subtab" data-claim-mode="self" aria-selected="true">Issue about me</button>
-          <button type="button" class="subtab" data-claim-mode="other">Issue about someone else</button>
-          <button type="button" class="subtab" data-claim-mode="import">Import a claim</button>
-        </nav>
-
-        <form id="form-claim" data-claim-mode="self">
-          <label id="claim-subject-label" hidden>
-            <span>Subject</span>
-            <input id="claim-subject" type="text" placeholder="alice or 02ab… (66-char pubkey)" autocomplete="off" />
-            <small id="claim-subject-feedback" class="muted">Enter a Web3Keys handle or a compressed secp256k1 public key.</small>
-          </label>
-          <label>
-            <span>Claim type</span>
-            <select id="claim-type" required>
-              <option value="" disabled selected>Choose a type…</option>
-              <option value="name">Name</option>
-              <option value="email">Email</option>
-              <option value="domain">Controls a domain</option>
-              <option value="social">Social account</option>
-              <option value="ownership">Ownership / authorship</option>
-              <option value="custom">Custom JSON</option>
-            </select>
-          </label>
-          <div id="claim-fields"></div>
-          <label>
-            <span>Expires (optional)</span>
-            <input id="claim-expires" type="date" />
-          </label>
-          <label class="inline">
-            <input id="claim-sd" type="checkbox" />
-            <span>Selective disclosure — let the holder reveal individual fields later instead of all at once.</span>
-          </label>
-          <button class="primary" type="submit" id="claim-submit">Sign claim</button>
-        </form>
-
-        <form id="form-claim-import" hidden>
-          <label>
-            <span>Paste signed claim JSON</span>
-            <textarea id="claim-import-json" rows="8" required placeholder='{ "v": 1, "context": "https://web3keys.com/contexts/v1", ... }'></textarea>
-            <small class="muted">Anyone can hand you a signed JSON claim. We'll verify its signature and save it to this identity if the subject matches.</small>
-          </label>
-          <div class="welcome-cta">
-            <button class="primary" type="submit">Verify & save</button>
-            <button class="ghost" type="button" id="claim-import-clear">Clear</button>
-          </div>
-        </form>
-
-        <div id="claim-output" hidden class="result">
-          <h3 id="claim-output-title">Signed claim</h3>
-          <p class="muted" id="claim-output-desc">Copy this JSON and send it to the subject. They can paste it into "Import a claim" to save it on their own Web3Keys.</p>
-          <pre id="claim-output-json" class="signature"></pre>
-          <div class="welcome-cta">
-            <button class="secondary" type="button" id="claim-output-copy">Copy</button>
-            <button class="ghost" type="button" id="claim-output-done">Done</button>
-          </div>
-        </div>
-
-        <div class="result" id="claims-list-wrap">
-          <h3>Your claims</h3>
-          <div id="claims-list" class="claims-list"></div>
-        </div>
-      </div>
-
-      <div class="tab-panel" data-panel="settings" hidden>
-        <h3>Recovery</h3>
-        <p class="muted">Your recovery phrase is the master key. Anyone who has it can recreate your identity on any device. Keep it offline and safe.</p>
-        <button class="secondary" id="btn-show-mnemonic">Show recovery phrase</button>
-        <div id="mnemonic-revealed" hidden class="mnemonic-revealed">
-          <div id="mnemonic-revealed-grid" class="mnemonic-grid"></div>
-          <button class="ghost" id="btn-hide-mnemonic">Hide</button>
-        </div>
-
-        <h3>Profile</h3>
-        <div class="row"><span class="label">Public profile</span><a id="settings-profile-link" href="#" target="_blank">—</a></div>
-
-        <h3>Cloud backup</h3>
-        <p class="muted">Optional. We store an AES-GCM-encrypted backup of your mnemonic and claims, indexed by an HMAC of your email. Your recovery passphrase still decrypts it — the server never sees the plaintext. To retrieve it on another device, click the link we email you and enter your passphrase.</p>
-        <div id="backup-status" class="result" hidden>
-          <div class="row"><span class="label">Status</span><span id="backup-state" class="pill">—</span></div>
-          <div class="row"><span class="label">Email</span><code id="backup-email">—</code></div>
-          <div class="row"><span class="label">Last updated</span><span id="backup-updated">—</span></div>
-          <div class="actions" style="margin-top:1rem">
-            <button class="secondary" id="btn-backup-update" type="button">Update backup</button>
-            <button class="ghost danger" id="btn-backup-remove" type="button">Remove backup</button>
-          </div>
-        </div>
-        <form id="form-backup-setup" hidden>
-          <label>
-            <span>Recovery email</span>
-            <input id="backup-email-input" type="email" required placeholder="you@example.com" autocomplete="email" />
-            <small class="muted">A magic link to this address will gate retrieval. We do not store your email in plaintext — only an HMAC of it.</small>
-          </label>
-          <label>
-            <span>Backup passphrase</span>
-            <input id="backup-pass-input" type="password" required minlength="8" autocomplete="new-password" />
-            <small class="muted">Used only to encrypt the backup. The server never sees this. You'll need it to recover on another device.</small>
-          </label>
-          <label>
-            <span>Confirm backup passphrase</span>
-            <input id="backup-pass-confirm" type="password" required minlength="8" />
-          </label>
-          <div class="welcome-cta">
-            <button class="primary" type="submit">Enable cloud backup</button>
-            <button class="ghost" type="button" id="btn-backup-cancel">Cancel</button>
-          </div>
-        </form>
-        <button class="secondary" id="btn-backup-enable" type="button">Set up cloud backup</button>
-
-        <h3>Identities on this device</h3>
-        <div id="identities-list" class="identities-list"></div>
-        <button class="secondary" id="btn-settings-add">+ Add another identity</button>
-
-        <h3>This device</h3>
-        <p class="muted">Every signature already re-prompts your biometric, so there's no separate "sign out." To stop using this device entirely, erase it below — make sure your recovery phrases are saved first.</p>
-        <div class="account-footer">
-          <button class="ghost danger" id="btn-reset">Erase this device (all identities)</button>
-        </div>
-      </div>
-    </section>
-
-    <div id="status" class="status" role="status" aria-live="polite"></div>
-  </main>
-
-  <script type="module" src="/js/app.js"></script>
+  <script>
+    // If a vault exists locally, change the primary "Get started" CTA labels to
+    // "Open wallet" so returning users know where to land.
+    (async function () {
+      try {
+        const open = indexedDB.open('web3keys', 1);
+        await new Promise((res, rej) => { open.onsuccess = res; open.onerror = rej; });
+        const db = open.result;
+        if (!db.objectStoreNames.contains('vault')) return;
+        const tx = db.transaction('vault', 'readonly');
+        const req = tx.objectStore('vault').get('default');
+        await new Promise((res) => { req.onsuccess = res; req.onerror = res; });
+        const v = req.result;
+        if (v && (v.vaults && Object.keys(v.vaults).length > 0)) {
+          document.querySelectorAll('.landing-cta').forEach((el) => { el.textContent = 'Open wallet →'; });
+          document.querySelector('.landing-nav-cta').textContent = 'Open wallet';
+        }
+      } catch {}
+    })();
+  </script>
 </body>
 </html>
