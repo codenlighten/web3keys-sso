@@ -12,6 +12,10 @@ function row(label, value, mono = false) {
   return r;
 }
 
+function b64urlEncode(s) {
+  return btoa(s).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
+}
+
 async function fetchHandleHint(pubKey) {
   try {
     const res = await fetch(`/api/paymail/${encodeURIComponent(pubKey)}`);
@@ -49,8 +53,21 @@ $('#form-verify').addEventListener('submit', async (e) => {
   const details = $('#v-details');
   details.innerHTML = '';
 
-  details.append(row('ID', parsed.id || '—', true));
-  details.append(row('Type', parsed.claimType ? `${parsed.type} / ${parsed.claimType}` : (parsed.type || '—')));
+  const sub = parsed.subject || {};
+  const iss = parsed.issuer || {};
+  const samePerson = sub.pubKey && iss.pubKey && sub.pubKey === iss.pubKey;
+
+  // Headline summary banner explaining what kind of claim this is.
+  const banner = document.createElement('div');
+  banner.className = 'claim-banner';
+  const subLabel = sub.handle ? `@${sub.handle}` : (sub.pubKey ? sub.pubKey.slice(0, 12) + '…' : 'unknown');
+  const issLabel = iss.handle ? `@${iss.handle}` : (iss.pubKey ? iss.pubKey.slice(0, 12) + '…' : 'unknown');
+  if (samePerson) {
+    banner.innerHTML = `<strong>${subLabel}</strong> made this self-claim.`;
+  } else {
+    banner.innerHTML = `<strong>${issLabel}</strong> attests this about <strong>${subLabel}</strong>.`;
+  }
+  details.append(banner);
 
   const claimDef = CLAIM_TYPES[parsed.claimType];
   if (claimDef && parsed.claim) {
@@ -59,23 +76,38 @@ $('#form-verify').addEventListener('submit', async (e) => {
     if (summary) details.append(row(claimDef.label, summary));
   }
 
-  details.append(row('Issued at', parsed.issuedAt || '—'));
-  if (parsed.expiresAt) details.append(row('Expires at', parsed.expiresAt));
+  details.append(row('Type', parsed.claimType ? `${parsed.type} / ${parsed.claimType}` : (parsed.type || '—')));
+  details.append(row('Issued', parsed.issuedAt ? new Date(parsed.issuedAt).toLocaleString() : '—'));
+  if (parsed.expiresAt) details.append(row('Expires', new Date(parsed.expiresAt).toLocaleString()));
 
-  const sub = parsed.subject || {};
-  if (sub.handle) details.append(row('Subject', `@${sub.handle}`));
-  if (sub.pubKey) details.append(row('Subject pubkey', sub.pubKey, true));
-
-  const iss = parsed.issuer || {};
-  if (iss.handle) details.append(row('Issuer', `@${iss.handle}`));
-  if (iss.pubKey) details.append(row('Issuer pubkey', iss.pubKey, true));
-
+  if (sub.handle || sub.pubKey) {
+    details.append(row('Subject', sub.handle ? `@${sub.handle}` : sub.pubKey, !sub.handle));
+    if (sub.handle && sub.pubKey) details.append(row('Subject pubkey', sub.pubKey, true));
+  }
+  if (iss.handle || iss.pubKey) {
+    details.append(row('Issuer', iss.handle ? `@${iss.handle}` : iss.pubKey, !iss.handle));
+    if (iss.handle && iss.pubKey) details.append(row('Issuer pubkey', iss.pubKey, true));
+  }
+  details.append(row('ID', parsed.id || '—', true));
   if (parsed.signature?.value) {
     details.append(row('Signature', parsed.signature.value.slice(0, 64) + '…', true));
   }
-
   const hex = await digestHex(parsed);
   details.append(row('Canonical digest', hex, true));
+
+  // CTA to import into the wallet — passes the attestation via URL hash so it
+  // doesn't end up in server logs.
+  if (result.verified) {
+    const importBox = document.createElement('div');
+    importBox.className = 'welcome-cta';
+    importBox.style.marginTop = '1rem';
+    const importBtn = document.createElement('a');
+    importBtn.className = 'primary button-link';
+    importBtn.href = `/?import=${b64urlEncode(JSON.stringify(parsed))}`;
+    importBtn.textContent = sub.pubKey ? 'Add to my Web3Keys wallet →' : 'Open Web3Keys →';
+    importBox.append(importBtn);
+    details.append(importBox);
+  }
 
   $('#verify-result').hidden = false;
   status('');

@@ -18,7 +18,7 @@ import {
   signAttestation, unlockMnemonic,
 } from './sign.js';
 import { setIdenticon, identiconSvg } from './identicon.js';
-import { isValidHandle, checkHandleAvailable, buildClaimMessage, claimHandle } from './profile.js';
+import { isValidHandle, checkHandleAvailable, buildClaimMessage, claimHandle, resolveSubject } from './profile.js';
 import { buildAttestation, CLAIM_TYPES, verifyAttestation } from './attestations.js';
 import { attachChooser } from './chooser.js';
 import {
@@ -176,6 +176,7 @@ async function refreshAccountView(vault) {
   await renderIdentitiesList();
   renderBackupSection(vault);
   showView('#view-account');
+  await checkPendingImport();
 }
 
 // ---- Live handle availability ----
@@ -215,16 +216,61 @@ function enterEmpty(mode) {
   showView('#view-empty');
 }
 
+function pendingImportFromUrl() {
+  const p = new URLSearchParams(location.search);
+  const raw = p.get('import');
+  if (!raw) return null;
+  try {
+    const pad = '='.repeat((4 - raw.length % 4) % 4);
+    return atob(raw.replace(/-/g, '+').replace(/_/g, '/') + pad);
+  } catch { return null; }
+}
+
+function consumeImportParam() {
+  if (location.search.includes('import=')) {
+    const url = new URL(location.href);
+    url.searchParams.delete('import');
+    history.replaceState({}, '', url.toString());
+  }
+}
+
 async function routeAfterBoot() {
   const vaults = await listVaults();
+  const imported = pendingImportFromUrl();
+
   if (vaults.length > 0) {
     const v = await activeVault();
     await refreshAccountView(v);
+    if (imported) {
+      // Switch to Claims tab → import section, pre-fill textarea.
+      $('.tab[data-tab="claims"]')?.click();
+      setClaimMode('import');
+      $('#claim-import-json').value = imported;
+      $('#claim-import-json').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      status('Review the incoming claim and click "Verify & save".', 'info');
+      consumeImportParam();
+    }
     return;
   }
   const welcomed = localStorage.getItem(WELCOMED_KEY) === '1';
   if (welcomed) enterEmpty('first');
   else showView('#view-welcome');
+  if (imported) {
+    status('Sign in to import this claim.', 'info');
+    // Stash it for after creation/restore.
+    sessionStorage.setItem('web3keys:pendingImport', imported);
+    consumeImportParam();
+  }
+}
+
+async function checkPendingImport() {
+  const stashed = sessionStorage.getItem('web3keys:pendingImport');
+  if (!stashed) return;
+  sessionStorage.removeItem('web3keys:pendingImport');
+  $('.tab[data-tab="claims"]')?.click();
+  setClaimMode('import');
+  $('#claim-import-json').value = stashed;
+  status('Review the incoming claim and click "Verify & save".', 'info');
 }
 
 // ---- Boot ----
@@ -629,6 +675,48 @@ function collectClaim(type) {
   return out;
 }
 
+function claimDirection(vault, claim) {
+  if (claim.direction) return claim.direction;
+  // Back-compat: infer from issuer/subject relative to active identity.
+  const me = vault.pubKey;
+  if (claim.issuer?.pubKey === me && claim.subject?.pubKey === me) return 'selfclaim';
+  if (claim.issuer?.pubKey === me) return 'issued';
+  return 'received';
+}
+
+function renderClaimCard(c, idx, direction, vault) {
+  const def = CLAIM_TYPES[c.claimType];
+  const card = document.createElement('div');
+  card.className = 'claim-card';
+  const label = def?.label || c.claimType;
+  let summary = '';
+  try { summary = def?.summary(c.claim) || ''; } catch {}
+
+  const subjectLabel = c.subject?.handle ? `@${c.subject.handle}` : (c.subject?.pubKey?.slice(0, 12) + '…');
+  const issuerLabel = c.issuer?.handle ? `@${c.issuer.handle}` : (c.issuer?.pubKey?.slice(0, 12) + '…');
+  const isMine = c.subject?.pubKey === vault.pubKey;
+  const isMyIssue = c.issuer?.pubKey === vault.pubKey;
+
+  let directionBadge = '';
+  if (direction === 'issued') directionBadge = `<span class="claim-card-direction">→ about ${escapeText(subjectLabel)}</span>`;
+  else if (direction === 'received') directionBadge = `<span class="claim-card-direction">← from ${escapeText(issuerLabel)}</span>`;
+
+  card.innerHTML = `
+    <div class="claim-card-head">
+      <span class="claim-card-type">${escapeText(label)}</span>
+      <span class="claim-card-id">${c.id.slice(0, 8)}…</span>
+    </div>
+    <div class="claim-card-summary">${summary ? escapeText(summary) : '<span class="muted">(no preview)</span>'}</div>
+    ${directionBadge ? `<div class="claim-card-meta">${directionBadge}</div>` : ''}
+    <div class="claim-card-actions">
+      <button class="ghost" data-act="copy" data-idx="${idx}">Copy JSON</button>
+      <button class="ghost" data-act="verify" data-idx="${idx}">Verify</button>
+      <button class="ghost danger" data-act="delete" data-idx="${idx}">Delete</button>
+    </div>
+  `;
+  return card;
+}
+
 function renderClaims(vault) {
   const list = $('#claims-list');
   list.innerHTML = '';
@@ -636,35 +724,129 @@ function renderClaims(vault) {
   if (claims.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'muted small';
-    empty.textContent = 'No claims yet. Sign one above.';
+    empty.textContent = 'No claims yet. Sign one above, or import one someone sent you.';
     list.append(empty);
     return;
   }
+
+  const groups = { selfclaim: [], issued: [], received: [] };
   claims.forEach((c, idx) => {
-    const def = CLAIM_TYPES[c.claimType];
-    const card = document.createElement('div');
-    card.className = 'claim-card';
-    const label = def?.label || c.claimType;
-    let summary = '';
-    try { summary = def?.summary(c.claim) || ''; } catch {}
-    card.innerHTML = `
-      <div class="claim-card-head">
-        <span class="claim-card-type">${label}</span>
-        <span class="claim-card-id">${c.id.slice(0, 8)}…</span>
-      </div>
-      <div class="claim-card-summary">${summary || '<span class="muted">(no preview)</span>'}</div>
-      <div class="claim-card-actions">
-        <button class="ghost" data-act="copy" data-idx="${idx}">Copy JSON</button>
-        <button class="ghost" data-act="verify" data-idx="${idx}">Verify</button>
-        <button class="ghost danger" data-act="delete" data-idx="${idx}">Delete</button>
-      </div>
-    `;
-    list.append(card);
+    const d = claimDirection(vault, c);
+    groups[d].push({ c, idx, d });
   });
+
+  function renderGroup(title, items) {
+    if (items.length === 0) return;
+    const h = document.createElement('h3');
+    h.className = 'claims-group-title';
+    h.textContent = title;
+    list.append(h);
+    items.forEach(({ c, idx, d }) => list.append(renderClaimCard(c, idx, d, vault)));
+  }
+
+  renderGroup('Self-claims', groups.selfclaim);
+  renderGroup('Issued (you signed about others)', groups.issued);
+  renderGroup('Received (signed about you by others)', groups.received);
+}
+
+let claimMode = 'self'; // 'self' | 'other' | 'import'
+let resolvedSubject = null; // when claimMode === 'other'
+
+function setClaimMode(mode) {
+  claimMode = mode;
+  document.querySelectorAll('[data-claim-mode]').forEach((el) => {
+    if (el.tagName === 'BUTTON' && el.dataset.claimMode) {
+      el.setAttribute('aria-selected', el.dataset.claimMode === mode ? 'true' : 'false');
+    }
+  });
+  $('#form-claim').hidden = mode === 'import';
+  $('#form-claim-import').hidden = mode !== 'import';
+  $('#claim-subject-label').hidden = mode !== 'other';
+  $('#claim-subject').required = mode === 'other';
+  $('#claim-submit').textContent = mode === 'other' ? 'Sign claim about subject' : 'Sign claim';
+  if (mode !== 'other') resolvedSubject = null;
+}
+
+function attachSubjectResolution() {
+  const input = $('#claim-subject');
+  const feedback = $('#claim-subject-feedback');
+  let timer = null;
+  const upd = (msg, kind) => { feedback.textContent = msg; feedback.dataset.kind = kind || ''; };
+  input.addEventListener('input', () => {
+    resolvedSubject = null;
+    clearTimeout(timer);
+    const v = input.value.trim();
+    if (!v) { upd('Enter a Web3Keys handle or a compressed secp256k1 public key.', ''); return; }
+    if (/^0[23][0-9a-fA-F]{64}$/.test(v)) {
+      resolvedSubject = { pubKey: v.toLowerCase() };
+      upd(`✓ Public key accepted.`, 'ok');
+      return;
+    }
+    upd('Looking up handle…', '');
+    timer = setTimeout(async () => {
+      try {
+        const subj = await resolveSubject(v);
+        resolvedSubject = subj;
+        upd(`✓ ${subj.handle ? '@' + subj.handle : 'pubkey'} → ${subj.pubKey.slice(0, 12)}…`, 'ok');
+      } catch (e) {
+        resolvedSubject = null;
+        upd(e.message || 'Lookup failed.', 'error');
+      }
+    }, 320);
+  });
+}
+
+async function signAndStoreClaim({ vault, claim, type, subject, direction, expiresAt }) {
+  const unsigned = buildAttestation({
+    claimType: type,
+    subject,
+    issuer: {
+      pubKey: vault.pubKey, address: vault.address,
+      ...(vault.handle ? { handle: vault.handle } : {}),
+    },
+    claim,
+    expiresAt,
+  });
+  const def = CLAIM_TYPES[type];
+  let summary = '';
+  try { summary = def.summary(claim); } catch {}
+  const aboutLabel = subject.handle ? `@${subject.handle}` :
+    (subject.pubKey === vault.pubKey ? (vault.handle ? `@${vault.handle} (you)` : 'you') : subject.pubKey);
+
+  const consent = await requestConsent({
+    kind: 'attestation',
+    title: direction === 'issued' ? `Issue claim about ${aboutLabel}` : `Sign self-claim: ${def.label}`,
+    risk: direction === 'issued' ? 'normal' : 'low',
+    summary: [
+      { label: 'About', value: aboutLabel, mono: !subject.handle && subject.pubKey !== vault.pubKey },
+      { label: 'Claim type', value: def.label },
+      { label: 'Detail', value: summary || '(custom payload)' },
+      { label: 'Issued by', value: vault.handle ? `@${vault.handle} (you)` : 'you' },
+      ...(expiresAt ? [{ label: 'Expires', value: expiresAt.slice(0, 10) }] : []),
+    ],
+    detail: JSON.stringify({ ...unsigned }, null, 2),
+    warning: direction === 'issued' ? 'This claim says something about someone else over your signature. Make sure it is true and that you want the subject to be able to present it.' : null,
+    biometricAvailable: biometricAvailable(vault),
+  });
+  if (!consent.approved) return null;
+
+  const signed = await signAttestation(vault, consent, unsigned);
+  signed.direction = direction;
+  vault.claims = vault.claims || [];
+  vault.claims.unshift(signed);
+  await putVault(vault);
+  return signed;
 }
 
 function wireClaims() {
   $('#claim-type').addEventListener('change', (e) => renderClaimFields(e.target.value));
+
+  document.querySelectorAll('[data-claim-mode]').forEach((tab) => {
+    if (tab.tagName !== 'BUTTON' || !tab.dataset.claimMode) return;
+    tab.addEventListener('click', () => setClaimMode(tab.dataset.claimMode));
+  });
+  attachSubjectResolution();
+  setClaimMode('self');
 
   $('#form-claim').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -672,54 +854,94 @@ function wireClaims() {
     if (!vault) return;
     const type = $('#claim-type').value;
     const expires = $('#claim-expires').value;
+
+    let subject; let direction;
+    if (claimMode === 'other') {
+      if (!resolvedSubject) { status('Resolve a valid subject first.', 'error'); return; }
+      subject = { ...resolvedSubject };
+      direction = subject.pubKey === vault.pubKey ? 'selfclaim' : 'issued';
+    } else {
+      subject = { pubKey: vault.pubKey, address: vault.address, ...(vault.handle ? { handle: vault.handle } : {}) };
+      direction = 'selfclaim';
+    }
+
     let claim;
     try { claim = collectClaim(type); }
     catch (err) { status(err.message, 'error'); return; }
 
     const expiresAt = expires ? new Date(expires + 'T23:59:59Z').toISOString() : undefined;
-    const unsigned = buildAttestation({
-      claimType: type,
-      subject: { pubKey: vault.pubKey, address: vault.address, ...(vault.handle ? { handle: vault.handle } : {}) },
-      issuer:  { pubKey: vault.pubKey, address: vault.address, ...(vault.handle ? { handle: vault.handle } : {}) },
-      claim,
-      expiresAt,
-    });
-
-    const def = CLAIM_TYPES[type];
-    let summary = '';
-    try { summary = def.summary(claim); } catch {}
-
-    const consent = await requestConsent({
-      kind: 'attestation',
-      title: `Sign claim: ${def.label}`,
-      risk: 'low',
-      summary: [
-        { label: 'About', value: vault.handle ? `@${vault.handle}` : vault.pubKey, mono: !vault.handle },
-        { label: 'Claim', value: summary || '(custom payload)' },
-        { label: 'Issued by', value: vault.handle ? `@${vault.handle} (you)` : 'you' },
-        ...(expiresAt ? [{ label: 'Expires', value: expiresAt.slice(0, 10) }] : []),
-      ],
-      detail: JSON.stringify({ ...unsigned }, null, 2),
-      biometricAvailable: biometricAvailable(vault),
-    });
-    if (!consent.approved) { status('Cancelled.'); return; }
 
     try {
       status('Signing claim…');
-      const signed = await signAttestation(vault, consent, unsigned);
-      vault.claims = vault.claims || [];
-      vault.claims.unshift(signed);
-      await putVault(vault);
+      const signed = await signAndStoreClaim({ vault, claim, type, subject, direction, expiresAt });
+      if (!signed) { status('Cancelled.'); return; }
       invalidateVault();
       const fresh = await activeVault();
       renderClaims(fresh);
       $('#form-claim').reset();
       $('#claim-fields').innerHTML = '';
-      status('Claim signed.', 'ok');
+
+      if (direction === 'issued') {
+        // Show the JSON so the issuer can hand it to the subject.
+        $('#claim-output-json').textContent = JSON.stringify(signed, null, 2);
+        $('#claim-output').hidden = false;
+        status(`Claim signed. Copy the JSON and send it to ${subject.handle ? '@' + subject.handle : 'them'}.`, 'ok');
+      } else {
+        status('Self-claim signed.', 'ok');
+      }
     } catch (err) {
       console.error(err); status(err.message || String(err), 'error');
     }
   });
+
+  $('#claim-output-copy').addEventListener('click', async () => {
+    await navigator.clipboard.writeText($('#claim-output-json').textContent);
+    status('Claim JSON copied.', 'ok');
+  });
+  $('#claim-output-done').addEventListener('click', () => {
+    $('#claim-output').hidden = true;
+    status('');
+  });
+
+  $('#form-claim-import').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const text = $('#claim-import-json').value.trim();
+    if (!text) return;
+    let parsed;
+    try { parsed = JSON.parse(text); }
+    catch { status('Not valid JSON.', 'error'); return; }
+    const bsv = bsvLib();
+    const result = await verifyAttestation(parsed, bsv);
+    if (!result.verified) { status(`Signature did not verify: ${result.reason}`, 'error'); return; }
+
+    const vault = await activeVault();
+    if (!vault) return;
+    if (parsed.subject?.pubKey !== vault.pubKey) {
+      const accept = confirm(`This claim's subject is not the active identity (${vault.handle ? '@' + vault.handle : vault.pubKey.slice(0, 12) + '…'}). Save it anyway?`);
+      if (!accept) return;
+    }
+    if (parsed.issuer?.pubKey === vault.pubKey) {
+      // The user is importing something they signed themselves — already self-claim semantics.
+    }
+    parsed.direction = parsed.issuer?.pubKey === vault.pubKey ? (parsed.subject?.pubKey === vault.pubKey ? 'selfclaim' : 'issued') : 'received';
+
+    // De-dupe by id.
+    vault.claims = vault.claims || [];
+    if (vault.claims.find((c) => c.id === parsed.id)) {
+      status('This claim is already in your wallet.', 'warn');
+      return;
+    }
+    vault.claims.unshift(parsed);
+    await putVault(vault);
+    invalidateVault();
+    const fresh = await activeVault();
+    renderClaims(fresh);
+    $('#claim-import-json').value = '';
+    setClaimMode('self');
+    status(result.expired ? 'Claim saved (already expired).' : 'Claim verified and saved.', result.expired ? 'warn' : 'ok');
+  });
+
+  $('#claim-import-clear').addEventListener('click', () => { $('#claim-import-json').value = ''; });
 
   $('#claims-list').addEventListener('click', async (e) => {
     const btn = e.target.closest('button[data-act]');

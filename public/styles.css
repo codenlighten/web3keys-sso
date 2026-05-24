@@ -1041,11 +1041,43 @@ pre.signature {
   word-break: break-word;
   color: var(--text-primary);
 }
+.claim-card-meta { margin: 0.25rem 0 0.5rem; }
+.claim-card-direction {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+}
 .claim-card-actions { display: flex; gap: 0.35rem; }
 .claim-card-actions button {
   font-size: 0.72rem;
   padding: 0.35rem 0.65rem;
 }
+
+.claims-group-title {
+  font-size: 0.7rem !important;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin: 1rem 0 0.5rem !important;
+}
+.claims-group-title:first-child { margin-top: 0.25rem !important; }
+
+.claim-banner {
+  background: rgba(0, 229, 255, 0.06);
+  border: 1px solid rgba(0, 229, 255, 0.2);
+  color: var(--text-primary);
+  padding: 0.875rem 1rem;
+  border-radius: var(--radius-md);
+  margin-bottom: 0.75rem;
+  font-size: 0.95rem;
+}
+.claim-banner strong { color: var(--accent); }
 
 /* ==========================================================================
    16. SSR PROFILE PAGE (/u/:handle) & VERIFY PAGE

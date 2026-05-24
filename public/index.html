@@ -3,7 +3,15 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Web3Keys — your BSV identity</title>
+  <meta name="theme-color" content="#0a0c10" />
+  <title>Web3Keys — Your identity, signed by you</title>
+  <meta name="description" content="A noncustodial identity portal. You own the key. Sign claims about yourself, verify anyone, share what you choose." />
+  <meta property="og:title" content="Web3Keys — Your identity, signed by you" />
+  <meta property="og:description" content="A noncustodial identity portal. You own the key. Sign claims about yourself, verify anyone, share what you choose." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://web3keys.com/" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="stylesheet" href="/styles.css" />
   <script src="/vendor/bsv.bundle.js"></script>
   <script src="/vendor/bsv-mnemonic.min.js"></script>
@@ -299,17 +307,29 @@
       </div>
 
       <div class="tab-panel" data-panel="claims" hidden>
-        <p class="muted">Claims are signed statements about your identity. Issue them yourself, share them anywhere, and anyone can verify them at <a href="/verify">/verify</a>. The signing key never leaves this device.</p>
-        <form id="form-claim">
+        <p class="muted">Claims are signed statements about an identity. Sign them yourself for self-claims, sign them about others to endorse or attest, or import claims someone else signed about you. Anyone can verify any claim at <a href="/verify">/verify</a>.</p>
+
+        <nav class="subtabs" id="claim-mode-tabs">
+          <button type="button" class="subtab" data-claim-mode="self" aria-selected="true">Issue about me</button>
+          <button type="button" class="subtab" data-claim-mode="other">Issue about someone else</button>
+          <button type="button" class="subtab" data-claim-mode="import">Import a claim</button>
+        </nav>
+
+        <form id="form-claim" data-claim-mode="self">
+          <label id="claim-subject-label" hidden>
+            <span>Subject</span>
+            <input id="claim-subject" type="text" placeholder="alice or 02ab… (66-char pubkey)" autocomplete="off" />
+            <small id="claim-subject-feedback" class="muted">Enter a Web3Keys handle or a compressed secp256k1 public key.</small>
+          </label>
           <label>
             <span>Claim type</span>
             <select id="claim-type" required>
               <option value="" disabled selected>Choose a type…</option>
-              <option value="name">My name</option>
-              <option value="email">My email</option>
-              <option value="domain">I control a domain</option>
-              <option value="social">My social account</option>
-              <option value="ownership">I own / authored this</option>
+              <option value="name">Name</option>
+              <option value="email">Email</option>
+              <option value="domain">Controls a domain</option>
+              <option value="social">Social account</option>
+              <option value="ownership">Ownership / authorship</option>
               <option value="custom">Custom JSON</option>
             </select>
           </label>
@@ -318,8 +338,31 @@
             <span>Expires (optional)</span>
             <input id="claim-expires" type="date" />
           </label>
-          <button class="primary" type="submit">Sign claim</button>
+          <button class="primary" type="submit" id="claim-submit">Sign claim</button>
         </form>
+
+        <form id="form-claim-import" hidden>
+          <label>
+            <span>Paste signed claim JSON</span>
+            <textarea id="claim-import-json" rows="8" required placeholder='{ "v": 1, "context": "https://web3keys.com/contexts/v1", ... }'></textarea>
+            <small class="muted">Anyone can hand you a signed JSON claim. We'll verify its signature and save it to this identity if the subject matches.</small>
+          </label>
+          <div class="welcome-cta">
+            <button class="primary" type="submit">Verify & save</button>
+            <button class="ghost" type="button" id="claim-import-clear">Clear</button>
+          </div>
+        </form>
+
+        <div id="claim-output" hidden class="result">
+          <h3>Signed claim</h3>
+          <p class="muted">Copy this JSON and send it to the subject. They can paste it into "Import a claim" to save it on their own Web3Keys.</p>
+          <pre id="claim-output-json" class="signature"></pre>
+          <div class="welcome-cta">
+            <button class="secondary" type="button" id="claim-output-copy">Copy</button>
+            <button class="ghost" type="button" id="claim-output-done">Done</button>
+          </div>
+        </div>
+
         <div class="result" id="claims-list-wrap">
           <h3>Your claims</h3>
           <div id="claims-list" class="claims-list"></div>

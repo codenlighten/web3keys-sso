@@ -40,8 +40,13 @@ export function renderProfilePage(record) {
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>${display} (@${handle}) — Web3Keys</title>
   <meta name="description" content="${display}'s verified identity on Web3Keys." />
+  <meta name="theme-color" content="#0a0c10" />
   <meta property="og:title" content="${display} (@${handle})" />
   <meta property="og:description" content="Verified identity on Web3Keys" />
+  <meta property="og:type" content="profile" />
+  <meta property="og:url" content="https://web3keys.com/u/${handle}" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body class="profile-body">

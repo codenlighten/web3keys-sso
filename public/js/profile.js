@@ -47,3 +47,22 @@ export async function fetchProfile(handle) {
   if (!res.ok) throw new Error('Profile fetch failed');
   return res.json();
 }
+
+// Resolve a subject "identifier" into a normalised { pubKey, handle?, address? }.
+// Accepts:
+//   - 66-char hex (compressed secp256k1 pubkey)         → assumed pubkey
+//   - "alice" or "alice@web3keys.com"                   → handle lookup
+export async function resolveSubject(input) {
+  const raw = String(input || '').trim();
+  if (!raw) throw new Error('Enter a handle or public key.');
+  // Compressed pubkey hex?
+  if (/^0[23][0-9a-fA-F]{64}$/.test(raw)) {
+    return { pubKey: raw.toLowerCase() };
+  }
+  // Strip @web3keys.com suffix if present.
+  const handle = raw.replace(/@web3keys\.com$/i, '').toLowerCase();
+  if (!isValidHandle(handle)) throw new Error('That handle is not a valid Web3Keys handle.');
+  const profile = await fetchProfile(handle);
+  if (!profile) throw new Error(`No identity claimed for @${handle}.`);
+  return { pubKey: profile.pubKey, handle: profile.handle, address: profile.address, displayName: profile.displayName };
+}
