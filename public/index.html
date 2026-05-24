@@ -58,6 +58,9 @@
         <button id="btn-welcome-create" class="primary">Create your identity</button>
         <button id="btn-welcome-restore" class="ghost">I have a recovery phrase</button>
       </div>
+      <div style="margin-top:1rem;text-align:center;">
+        <a href="#" id="link-welcome-cloud" class="muted">Restore from a cloud backup →</a>
+      </div>
     </section>
 
     <section id="view-empty" hidden>
@@ -84,6 +87,8 @@
         <button class="primary" type="submit" id="btn-create">Create identity</button>
         <button type="button" class="ghost" id="btn-empty-back" hidden>Back</button>
       </form>
+      <button type="button" class="ghost" id="btn-empty-cloud" style="align-self:flex-start;margin-top:0.5rem">Restore from a cloud backup instead</button>
+
       <details class="advanced" id="restore-details">
         <summary>I already have a recovery phrase</summary>
         <form id="form-restore">
@@ -109,6 +114,25 @@
           <button class="secondary" type="submit">Restore</button>
         </form>
       </details>
+    </section>
+
+    <section id="view-cloud-request" hidden>
+      <h1>Restore from cloud backup</h1>
+      <p class="muted">Enter the email address tied to your backup. We'll send you a one-time link valid for 15 minutes. You'll still need your recovery passphrase to decrypt the backup — the server never sees it.</p>
+      <form id="form-cloud-request" autocomplete="off">
+        <label>
+          <span>Email</span>
+          <input id="cloud-request-email" type="email" required placeholder="you@example.com" autocomplete="email" />
+        </label>
+        <div class="welcome-cta">
+          <button class="primary" type="submit">Send recovery link</button>
+          <button class="ghost" type="button" id="cloud-request-back">Cancel</button>
+        </div>
+      </form>
+      <div id="cloud-request-sent" hidden class="result">
+        <p>If a backup exists for that email, a recovery link is on its way. Open it on this device when you're ready.</p>
+        <button class="ghost" type="button" id="cloud-request-done">Done</button>
+      </div>
     </section>
 
     <section id="view-mnemonic" hidden>
@@ -313,6 +337,39 @@
 
         <h3>Profile</h3>
         <div class="row"><span class="label">Public profile</span><a id="settings-profile-link" href="#" target="_blank">—</a></div>
+
+        <h3>Cloud backup</h3>
+        <p class="muted">Optional. We store an AES-GCM-encrypted backup of your mnemonic and claims, indexed by an HMAC of your email. Your recovery passphrase still decrypts it — the server never sees the plaintext. To retrieve it on another device, click the link we email you and enter your passphrase.</p>
+        <div id="backup-status" class="result" hidden>
+          <div class="row"><span class="label">Status</span><span id="backup-state" class="pill">—</span></div>
+          <div class="row"><span class="label">Email</span><code id="backup-email">—</code></div>
+          <div class="row"><span class="label">Last updated</span><span id="backup-updated">—</span></div>
+          <div class="actions" style="margin-top:1rem">
+            <button class="secondary" id="btn-backup-update" type="button">Update backup</button>
+            <button class="ghost danger" id="btn-backup-remove" type="button">Remove backup</button>
+          </div>
+        </div>
+        <form id="form-backup-setup" hidden>
+          <label>
+            <span>Recovery email</span>
+            <input id="backup-email-input" type="email" required placeholder="you@example.com" autocomplete="email" />
+            <small class="muted">A magic link to this address will gate retrieval. We do not store your email in plaintext — only an HMAC of it.</small>
+          </label>
+          <label>
+            <span>Backup passphrase</span>
+            <input id="backup-pass-input" type="password" required minlength="8" autocomplete="new-password" />
+            <small class="muted">Used only to encrypt the backup. The server never sees this. You'll need it to recover on another device.</small>
+          </label>
+          <label>
+            <span>Confirm backup passphrase</span>
+            <input id="backup-pass-confirm" type="password" required minlength="8" />
+          </label>
+          <div class="welcome-cta">
+            <button class="primary" type="submit">Enable cloud backup</button>
+            <button class="ghost" type="button" id="btn-backup-cancel">Cancel</button>
+          </div>
+        </form>
+        <button class="secondary" id="btn-backup-enable" type="button">Set up cloud backup</button>
 
         <h3>Identities on this device</h3>
         <div id="identities-list" class="identities-list"></div>

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Recover your identity — Web3Keys</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <script src="/vendor/bsv.bundle.js"></script>
+  <script src="/vendor/bsv-mnemonic.min.js"></script>
+</head>
+<body>
+  <main class="card" id="app">
+    <header class="brand">
+      <a class="logo" href="/">w3k</a>
+      <div>
+        <div class="brand-name">Recover your identity</div>
+        <div class="brand-tagline">Web3Keys cloud backup</div>
+      </div>
+    </header>
+
+    <section id="rec-checking">
+      <h1>Checking your recovery link…</h1>
+      <p class="muted">One moment.</p>
+    </section>
+
+    <section id="rec-invalid" hidden>
+      <h1>This link can't be used</h1>
+      <p id="rec-invalid-reason" class="muted">—</p>
+      <div class="welcome-cta">
+        <a class="primary button-link" href="/">Go to Web3Keys</a>
+      </div>
+    </section>
+
+    <section id="rec-ready" hidden>
+      <h1>Recover your Web3Keys identity</h1>
+      <p class="muted">Your encrypted backup is ready. Enter the recovery passphrase you used when setting up the backup to unlock it. The server never sees your passphrase or the decrypted mnemonic.</p>
+      <div class="profile-details">
+        <div class="row"><span class="label">Identity</span><span id="rec-hint-name">—</span></div>
+        <div class="row"><span class="label">Backed up</span><span id="rec-hint-when">—</span></div>
+      </div>
+      <form id="form-recover" autocomplete="off">
+        <label>
+          <span>Recovery passphrase</span>
+          <input id="rec-passphrase" type="password" required minlength="8" autocomplete="current-password" />
+        </label>
+        <label>
+          <span>Set a passphrase for this device</span>
+          <input id="rec-device-passphrase" type="password" required minlength="8" />
+          <small class="muted">Used as a fallback if biometrics fail on this device. Can match your recovery passphrase.</small>
+        </label>
+        <button class="primary" type="submit">Decrypt and restore</button>
+      </form>
+    </section>
+
+    <section id="rec-success" hidden>
+      <h1>Welcome back, <span id="rec-success-name">—</span>!</h1>
+      <p class="muted">Your identity is restored on this device, encrypted by your biometric.</p>
+      <div class="welcome-cta">
+        <a class="primary button-link" href="/">Open Web3Keys</a>
+      </div>
+    </section>
+
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+  </main>
+  <script type="module" src="/js/recover.js"></script>
+</body>
+</html>

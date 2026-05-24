@@ -21,6 +21,10 @@ import { setIdenticon, identiconSvg } from './identicon.js';
 import { isValidHandle, checkHandleAvailable, buildClaimMessage, claimHandle } from './profile.js';
 import { buildAttestation, CLAIM_TYPES, verifyAttestation } from './attestations.js';
 import { attachChooser } from './chooser.js';
+import {
+  buildBackupPlaintext, encryptBackup,
+  saveBackup, requestRetrieve, deleteBackup, buildDeleteMessage,
+} from './backup.js';
 
 const WELCOMED_KEY = 'web3keys:welcomed';
 let createMode = 'first'; // 'first' | 'add'
@@ -170,6 +174,7 @@ async function refreshAccountView(vault) {
   $('#acct-claim-handle').hidden = !!vault.handle;
   renderClaims(vault);
   await renderIdentitiesList();
+  renderBackupSection(vault);
   showView('#view-account');
 }
 
@@ -246,6 +251,8 @@ async function boot() {
   wireEncrypt();
   wireSettings();
   wireChooser();
+  wireCloudRequest();
+  wireBackup();
 
   await routeAfterBoot();
 }
@@ -264,6 +271,49 @@ function wireWelcome() {
     const v = await activeVault();
     if (v) { await refreshAccountView(v); return; }
     showView('#view-welcome');
+  });
+  $('#link-welcome-cloud').addEventListener('click', (e) => {
+    e.preventDefault();
+    localStorage.setItem(WELCOMED_KEY, '1');
+    enterCloudRequest();
+  });
+  $('#btn-empty-cloud').addEventListener('click', () => {
+    enterCloudRequest();
+  });
+}
+
+function enterCloudRequest() {
+  $('#cloud-request-email').value = '';
+  $('#cloud-request-sent').hidden = true;
+  $('#form-cloud-request').hidden = false;
+  showView('#view-cloud-request');
+}
+
+function wireCloudRequest() {
+  $('#form-cloud-request').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = $('#cloud-request-email').value.trim();
+    try {
+      status('Sending recovery link…');
+      await requestRetrieve(email);
+      $('#form-cloud-request').hidden = true;
+      $('#cloud-request-sent').hidden = false;
+      status('If a backup exists for that email, the link is on its way.', 'ok');
+    } catch (err) {
+      console.error(err);
+      status(err.message || String(err), 'error');
+    }
+  });
+  $('#cloud-request-back').addEventListener('click', async () => {
+    const v = await activeVault();
+    if (v) await refreshAccountView(v);
+    else if (localStorage.getItem(WELCOMED_KEY) === '1') enterEmpty('first');
+    else showView('#view-welcome');
+  });
+  $('#cloud-request-done').addEventListener('click', async () => {
+    const v = await activeVault();
+    if (v) await refreshAccountView(v);
+    else showView('#view-welcome');
   });
 }
 
@@ -921,6 +971,147 @@ async function renderIdentitiesList() {
 
 function escapeText(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// ---- Cloud backup (Settings) ----
+function renderBackupSection(vault) {
+  const cb = vault.cloudBackup || { enabled: false };
+  const enableBtn = $('#btn-backup-enable');
+  const setupForm = $('#form-backup-setup');
+  const statusBox = $('#backup-status');
+  if (cb.enabled) {
+    enableBtn.hidden = true;
+    setupForm.hidden = true;
+    statusBox.hidden = false;
+    $('#backup-state').textContent = 'Enabled';
+    $('#backup-state').dataset.kind = 'ok';
+    $('#backup-email').textContent = cb.email || '—';
+    $('#backup-updated').textContent = cb.lastBackupAt ? new Date(cb.lastBackupAt).toLocaleString() : '—';
+  } else {
+    enableBtn.hidden = false;
+    setupForm.hidden = true;
+    statusBox.hidden = true;
+  }
+}
+
+async function encryptAndUploadBackup({ vault, email, passphrase }) {
+  // Unlock the mnemonic on this device, then encrypt it with the user's backup passphrase.
+  const consent = await requestConsent({
+    kind: 'cloud-backup',
+    title: 'Encrypt and upload your backup',
+    risk: 'high',
+    summary: [
+      { label: 'Email (HMAC only)', value: email },
+      { label: 'Includes', value: 'mnemonic, identity profile, signed claims' },
+      { label: 'Encryption', value: 'AES-256-GCM, PBKDF2-SHA256 600k iters' },
+    ],
+    warning: 'A new attack surface: anyone who has both your email AND your backup passphrase can recover your identity. Use a strong, unique passphrase.',
+    biometricAvailable: biometricAvailable(vault),
+  });
+  if (!consent.approved) throw new Error('Cancelled.');
+
+  // Unlock mnemonic
+  const mnemonic = await unlockMnemonic(vault, consent);
+  const plaintext = buildBackupPlaintext({ mnemonic, vault });
+  const payload = await encryptBackup(plaintext, passphrase);
+  const result = await saveBackup({
+    email,
+    payload,
+    pubKey: vault.pubKey,
+    displayName: vault.displayName || null,
+    handle: vault.handle || null,
+  });
+  vault.cloudBackup = { enabled: true, email, lastBackupAt: result.updatedAt || new Date().toISOString() };
+  await putVault(vault);
+  return vault;
+}
+
+function wireBackup() {
+  $('#btn-backup-enable').addEventListener('click', () => {
+    $('#btn-backup-enable').hidden = true;
+    $('#form-backup-setup').hidden = false;
+    $('#backup-email-input').value = '';
+    $('#backup-pass-input').value = '';
+    $('#backup-pass-confirm').value = '';
+    $('#backup-email-input').focus();
+  });
+  $('#btn-backup-cancel').addEventListener('click', () => {
+    $('#form-backup-setup').hidden = true;
+    $('#btn-backup-enable').hidden = false;
+  });
+  $('#form-backup-setup').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = $('#backup-email-input').value.trim();
+    const passphrase = $('#backup-pass-input').value;
+    const confirm = $('#backup-pass-confirm').value;
+    if (passphrase !== confirm) { status('Passphrases do not match.', 'error'); return; }
+
+    const vault = await activeVault();
+    if (!vault) return;
+    try {
+      status('Encrypting and uploading…');
+      const updated = await encryptAndUploadBackup({ vault, email, passphrase });
+      invalidateVault();
+      await refreshAccountView(await activeVault());
+      status('Cloud backup enabled.', 'ok');
+    } catch (err) {
+      console.error(err);
+      status(err.message || String(err), 'error');
+    }
+  });
+
+  $('#btn-backup-update').addEventListener('click', async () => {
+    const vault = await activeVault();
+    if (!vault?.cloudBackup?.email) return;
+    const passphrase = prompt('Re-enter your backup passphrase to refresh the cloud backup. Must match what you used at setup; if it differs, the next recovery will require this new passphrase.');
+    if (!passphrase) return;
+    try {
+      status('Refreshing cloud backup…');
+      await encryptAndUploadBackup({ vault, email: vault.cloudBackup.email, passphrase });
+      invalidateVault();
+      await refreshAccountView(await activeVault());
+      status('Cloud backup updated.', 'ok');
+    } catch (err) {
+      console.error(err);
+      status(err.message || String(err), 'error');
+    }
+  });
+
+  $('#btn-backup-remove').addEventListener('click', async () => {
+    const vault = await activeVault();
+    if (!vault?.cloudBackup?.email) return;
+    if (!confirm('Remove your cloud backup? You will lose the ability to recover this identity by email — only your 24-word phrase will work after this.')) return;
+
+    const consent = await requestConsent({
+      kind: 'backup-delete',
+      title: 'Remove cloud backup',
+      risk: 'high',
+      summary: [
+        { label: 'Email', value: vault.cloudBackup.email },
+        { label: 'Identity', value: vault.handle ? `@${vault.handle}` : vault.pubKey, mono: !vault.handle },
+      ],
+      warning: 'After this, your 24-word phrase is the only way to recover this identity.',
+      approveLabel: 'Sign deletion request',
+      biometricAvailable: biometricAvailable(vault),
+    });
+    if (!consent.approved) { status('Cancelled.'); return; }
+
+    try {
+      const ts = Date.now();
+      const message = buildDeleteMessage({ email: vault.cloudBackup.email, pubKey: vault.pubKey, ts });
+      const { signature } = await signMessage(vault, consent, message);
+      status('Submitting deletion…');
+      await deleteBackup({ email: vault.cloudBackup.email, pubKey: vault.pubKey, message, signature });
+      vault.cloudBackup = { enabled: false, email: null, lastBackupAt: null };
+      await putVault(vault);
+      invalidateVault();
+      await refreshAccountView(await activeVault());
+      status('Cloud backup removed.', 'ok');
+    } catch (err) {
+      console.error(err);
+      status(err.message || String(err), 'error');
+    }
+  });
 }
 
 // ---- Settings (show phrase + reset) ----
