@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Verify an attestation — Web3Keys</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <script src="/vendor/bsv.bundle.js"></script>
+</head>
+<body>
+  <main class="card" id="app">
+    <header class="brand">
+      <a class="logo" href="/">w3k</a>
+      <div>
+        <div class="brand-name">Web3Keys</div>
+        <div class="brand-tagline">Verify a signed attestation.</div>
+      </div>
+    </header>
+
+    <h1>Verify an attestation</h1>
+    <p class="muted">Paste a signed claim. Web3Keys recomputes its digest and checks the signature against the issuer's public key. Nothing is sent to a server — all verification happens in your browser.</p>
+
+    <form id="form-verify">
+      <label>
+        <span>Attestation JSON</span>
+        <textarea id="att-json" rows="10" required placeholder='{ "v": 1, "context": "https://web3keys.com/contexts/v1", ... }'></textarea>
+      </label>
+      <button class="primary" type="submit">Verify</button>
+    </form>
+
+    <div id="verify-result" hidden>
+      <div class="row"><span class="label">Result</span><span id="v-pill" class="pill"></span></div>
+      <div id="v-details" class="result"></div>
+    </div>
+
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+    <footer class="account-footer">
+      <a class="ghost button-link" href="/">← Back to wallet</a>
+    </footer>
+  </main>
+
+  <script type="module" src="/js/verify.js"></script>
+</body>
+</html>

@@ -20,22 +20,45 @@
     </header>
 
     <section id="view-empty" hidden>
-      <h1>Create your identity</h1>
-      <p class="muted">A noncustodial BSV identity, gated by your device biometric. The key never leaves this device.</p>
+      <h1>Claim your identity</h1>
+      <p class="muted">A noncustodial BSV identity you fully own — paymail handle, public profile, signed attestations. The signing key never leaves this device and only your biometric unlocks it.</p>
       <form id="form-create" autocomplete="off">
+        <label>
+          <span>Your handle</span>
+          <div class="handle-input">
+            <input id="create-handle" type="text" required pattern="[a-z0-9](?:[a-z0-9_-]{1,30}[a-z0-9])?" maxlength="32" placeholder="alice" autocomplete="off" />
+            <span class="handle-suffix">@web3keys.com</span>
+          </div>
+          <small id="handle-feedback" class="muted">3–32 lowercase letters, digits, dashes, underscores.</small>
+        </label>
+        <label>
+          <span>Display name</span>
+          <input id="create-display" type="text" required maxlength="80" placeholder="Alice Example" autocomplete="off" />
+        </label>
         <label>
           <span>Recovery passphrase</span>
           <input id="create-passphrase" type="password" required minlength="8" placeholder="At least 8 characters" />
-          <small class="muted">Used as a fallback if biometrics fail and to encrypt cloud backups later. Cannot be recovered.</small>
+          <small class="muted">Backup unlock if biometrics fail. Can't be recovered if you forget it — your recovery phrase still works.</small>
         </label>
-        <button class="primary" type="submit">Create identity</button>
+        <button class="primary" type="submit" id="btn-create">Create identity</button>
       </form>
       <details class="advanced">
-        <summary>I already have a mnemonic</summary>
+        <summary>I already have a recovery phrase</summary>
         <form id="form-restore">
           <label>
             <span>Recovery phrase (12 or 24 words)</span>
             <textarea id="restore-mnemonic" rows="3" required placeholder="word word word ..."></textarea>
+          </label>
+          <label>
+            <span>Handle on this device (optional — leave blank to skip)</span>
+            <div class="handle-input">
+              <input id="restore-handle" type="text" pattern="[a-z0-9](?:[a-z0-9_-]{1,30}[a-z0-9])?" maxlength="32" placeholder="alice" autocomplete="off" />
+              <span class="handle-suffix">@web3keys.com</span>
+            </div>
+          </label>
+          <label>
+            <span>Display name (optional)</span>
+            <input id="restore-display" type="text" maxlength="80" autocomplete="off" />
           </label>
           <label>
             <span>New recovery passphrase for this device</span>
@@ -47,29 +70,66 @@
     </section>
 
     <section id="view-mnemonic" hidden>
-      <h1>Save your recovery phrase</h1>
-      <p class="muted">Write this down somewhere safe. It's the only way to recover this identity on a new device. We can't see it and can't help you recover it.</p>
-      <pre id="mnemonic-display" class="mnemonic"></pre>
-      <label class="inline">
+      <h1>Your recovery phrase</h1>
+      <p class="muted">24 words that <em>are</em> your identity. Write them down on paper and keep them somewhere only you can find. We can't see them and we can't help you recover them.</p>
+      <div id="mnemonic-grid" class="mnemonic-grid"></div>
+      <div class="mnemonic-actions">
+        <button class="ghost" type="button" id="btn-mnemonic-copy">Copy to clipboard</button>
+      </div>
+      <label class="inline mnemonic-confirm">
         <input id="mnemonic-confirm" type="checkbox" />
-        <span>I've saved my recovery phrase.</span>
+        <span>I've written these 24 words down somewhere safe.</span>
       </label>
       <button class="primary" id="mnemonic-continue" disabled>Continue</button>
     </section>
 
     <section id="view-account" hidden>
-      <h1>Signed in as</h1>
-      <div class="identity">
-        <div class="row"><span class="label">Address</span><code id="acct-address"></code></div>
+      <div class="profile-header">
+        <div class="profile-header-avatar" id="acct-avatar"></div>
+        <div class="profile-header-text">
+          <div class="profile-header-name" id="acct-display">—</div>
+          <div class="profile-header-handle">
+            <span id="acct-handle-prefix">—</span><span class="muted">@web3keys.com</span>
+            <a id="acct-profile-link" class="profile-link" href="#" target="_blank" hidden>view public profile ↗</a>
+          </div>
+        </div>
+        <div class="profile-header-meta">
+          <span id="acct-biometric" class="pill">—</span>
+        </div>
+      </div>
+
+      <details class="account-details">
+        <summary>Identity details</summary>
         <div class="row"><span class="label">Public key</span><code id="acct-pubkey"></code></div>
-        <div class="row"><span class="label">Biometric</span><span id="acct-biometric" class="pill"></span></div>
+        <div class="row"><span class="label">BSV address</span><code id="acct-address"></code></div>
+      </details>
+
+      <div id="acct-claim-handle" hidden>
+        <div class="consent-warning small">You don't have a public handle yet on this device. Claim one to get a public profile and let dApps recognize you by name.</div>
+        <form id="form-claim-handle">
+          <label>
+            <span>Pick a handle</span>
+            <div class="handle-input">
+              <input id="latehandle-input" type="text" pattern="[a-z0-9](?:[a-z0-9_-]{1,30}[a-z0-9])?" maxlength="32" required />
+              <span class="handle-suffix">@web3keys.com</span>
+            </div>
+            <small id="latehandle-feedback" class="muted">3–32 lowercase letters, digits, dashes, underscores.</small>
+          </label>
+          <label>
+            <span>Display name</span>
+            <input id="latehandle-display" type="text" maxlength="80" required />
+          </label>
+          <button class="primary" type="submit">Claim handle</button>
+        </form>
       </div>
 
       <nav class="tabs" role="tablist">
         <button class="tab" role="tab" data-tab="message" aria-selected="true">Message</button>
+        <button class="tab" role="tab" data-tab="claims">Claims</button>
         <button class="tab" role="tab" data-tab="transaction">Transaction</button>
         <button class="tab" role="tab" data-tab="hash">Hash</button>
         <button class="tab" role="tab" data-tab="ecies">Encrypt / Decrypt</button>
+        <button class="tab" role="tab" data-tab="settings">Settings</button>
       </nav>
 
       <div class="tab-panel" data-panel="message">
@@ -166,10 +226,52 @@
         </div>
       </div>
 
-      <footer class="account-footer">
-        <button class="ghost" id="btn-signout">Sign out</button>
-        <button class="ghost danger" id="btn-reset">Erase this device</button>
-      </footer>
+      <div class="tab-panel" data-panel="claims" hidden>
+        <p class="muted">Claims are signed statements about your identity. Issue them yourself, share them anywhere, and anyone can verify them at <a href="/verify">/verify</a>. The signing key never leaves this device.</p>
+        <form id="form-claim">
+          <label>
+            <span>Claim type</span>
+            <select id="claim-type" required>
+              <option value="" disabled selected>Choose a type…</option>
+              <option value="name">My name</option>
+              <option value="email">My email</option>
+              <option value="domain">I control a domain</option>
+              <option value="social">My social account</option>
+              <option value="ownership">I own / authored this</option>
+              <option value="custom">Custom JSON</option>
+            </select>
+          </label>
+          <div id="claim-fields"></div>
+          <label>
+            <span>Expires (optional)</span>
+            <input id="claim-expires" type="date" />
+          </label>
+          <button class="primary" type="submit">Sign claim</button>
+        </form>
+        <div class="result" id="claims-list-wrap">
+          <h3>Your claims</h3>
+          <div id="claims-list" class="claims-list"></div>
+        </div>
+      </div>
+
+      <div class="tab-panel" data-panel="settings" hidden>
+        <h3>Recovery</h3>
+        <p class="muted">Your recovery phrase is the master key. Anyone who has it can recreate your identity on any device. Keep it offline and safe.</p>
+        <button class="secondary" id="btn-show-mnemonic">Show recovery phrase</button>
+        <div id="mnemonic-revealed" hidden class="mnemonic-revealed">
+          <div id="mnemonic-revealed-grid" class="mnemonic-grid"></div>
+          <button class="ghost" id="btn-hide-mnemonic">Hide</button>
+        </div>
+
+        <h3>Profile</h3>
+        <div class="row"><span class="label">Public profile</span><a id="settings-profile-link" href="#" target="_blank">—</a></div>
+
+        <h3>This device</h3>
+        <div class="account-footer">
+          <button class="ghost" id="btn-signout">Sign out (this tab)</button>
+          <button class="ghost danger" id="btn-reset">Erase this device</button>
+        </div>
+      </div>
     </section>
 
     <div id="status" class="status" role="status" aria-live="polite"></div>

@@ -1,7 +1,9 @@
 import { base64ToBytes, kekFromPassword, kekFromPrf, unwrap } from './crypto.js';
 import { getPrfSecret } from './biometric.js';
+import { canonicalize, SIG_ALG } from './attestations.js';
 
 const INFO_WIF = 'web3keys/v1/wif-wrap';
+const INFO_MNEMONIC = 'web3keys/v1/mnemonic-wrap';
 
 function bsvLib() {
   const lib = window.bsv;
@@ -166,5 +168,41 @@ export async function decryptIncoming(vault, consent, ciphertextB64) {
   });
 }
 
-// ---- Public-key utilities ----
-export function pubKeyFromMnemonicMatchesVault(_) { /* placeholder for future tools */ }
+// ---- Attestations ----
+export async function signAttestation(vault, consent, unsignedAttestation) {
+  return withPrivateKey(vault, consent, async (priv, bsv) => {
+    const canon = canonicalize(unsignedAttestation);
+    const enc = new TextEncoder().encode(canon);
+    const digestBuf = await crypto.subtle.digest('SHA-256', enc);
+    const Buffer = bsv.deps.Buffer;
+    const digest = Buffer.from(new Uint8Array(digestBuf));
+    const sig = bsv.crypto.ECDSA.sign(digest, priv);
+    return {
+      ...unsignedAttestation,
+      signature: { alg: SIG_ALG, value: sig.toString() },
+    };
+  });
+}
+
+// ---- Decrypt the stored mnemonic (for "Show recovery phrase") ----
+export async function unlockMnemonic(vault, consent) {
+  if (consent.method === 'biometric') {
+    const w = vault.wrappedMnemonic.biometric;
+    if (!w) throw new Error('Biometric is not configured for this account.');
+    const prfBytes = await getPrfSecret({
+      credentialIdB64: w.credentialId,
+      prfSaltB64: w.prfSalt,
+    });
+    const kek = await kekFromPrf(prfBytes, INFO_MNEMONIC);
+    prfBytes.fill(0);
+    return unwrap(kek, w);
+  }
+  if (consent.method === 'password') {
+    if (!consent.password) throw new Error('Password required.');
+    const w = vault.wrappedMnemonic.password;
+    const kek = await kekFromPassword(consent.password, base64ToBytes(w.salt), w.iters);
+    try { return await unwrap(kek, w); }
+    catch { throw new Error('Wrong password.'); }
+  }
+  throw new Error('Unknown unlock method.');
+}
