@@ -113,6 +113,17 @@ app.get('/u/:handle', (req, res) => {
 });
 
 app.get('/verify', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'verify.html')));
+app.get('/sso',    (_req, res) => res.sendFile(path.join(__dirname, 'public', 'sso.html')));
+app.get('/demo',   (_req, res) => res.sendFile(path.join(__dirname, 'public', 'demo.html')));
+
+// SDK gets a permissive Cache-Control for dApp embedding, plus explicit CORS so
+// cross-origin <script> imports work without surprises.
+app.get('/sdk.js', (_req, res) => {
+  res.set('Cache-Control', 'public, max-age=300');
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Content-Type', 'application/javascript; charset=utf-8');
+  res.sendFile(path.join(__dirname, 'public', 'sdk.js'));
+});
 
 // ---- Static fallback last ----
 

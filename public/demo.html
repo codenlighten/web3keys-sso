@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Demo — Sign in with Web3Keys</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <script src="/sdk.js" defer></script>
+  <script src="/vendor/bsv.bundle.js" defer></script>
+</head>
+<body>
+  <main class="card">
+    <header class="brand">
+      <div class="logo">⌁</div>
+      <div>
+        <div class="brand-name">Demo dApp</div>
+        <div class="brand-tagline">A test relying party for Web3Keys SSO</div>
+      </div>
+    </header>
+
+    <h1>Sign in with Web3Keys</h1>
+    <p class="muted">This page mimics a third-party dApp asking Web3Keys to authenticate a visitor. Click the button — a popup at <code>web3keys.com/sso</code> opens, you pick an identity, and a signed ID token comes back here. The signature is verified entirely in your browser; this page never touches your private key.</p>
+
+    <div class="welcome-cta">
+      <div data-web3keys-signin data-client-id="demo.web3keys.com" data-scope="profile"></div>
+      <button class="ghost" type="button" id="btn-clear">Clear result</button>
+    </div>
+
+    <section id="result" hidden>
+      <h2>You signed in</h2>
+      <div class="profile-details">
+        <div class="row"><span class="label">Handle</span><code id="result-handle">—</code></div>
+        <div class="row"><span class="label">Display name</span><span id="result-name">—</span></div>
+        <div class="row"><span class="label">Public key</span><code id="result-pubkey">—</code></div>
+        <div class="row"><span class="label">Address</span><code id="result-address">—</code></div>
+        <div class="row"><span class="label">Audience</span><code id="result-aud">—</code></div>
+        <div class="row"><span class="label">Expires</span><span id="result-exp">—</span></div>
+        <div class="row"><span class="label">Signature</span><span id="result-verified" class="pill">—</span></div>
+      </div>
+
+      <details>
+        <summary>Raw ID token (JWT-shaped, secp256k1-signed)</summary>
+        <div class="trust-body">
+          <pre class="signature" id="result-token"></pre>
+        </div>
+      </details>
+      <details>
+        <summary>Decoded header + payload</summary>
+        <div class="trust-body">
+          <pre class="signature" id="result-decoded"></pre>
+        </div>
+      </details>
+    </section>
+
+    <h3>Integrate in your own page</h3>
+    <details open>
+      <summary>HTML drop-in</summary>
+      <div class="trust-body">
+        <pre class="signature">&lt;script src="https://web3keys.com/sdk.js"&gt;&lt;/script&gt;
+&lt;div data-web3keys-signin data-client-id="myapp.example.com"&gt;&lt;/div&gt;
+&lt;script&gt;
+  document.addEventListener('web3keys-signin', (e) =&gt; {
+    const { pubKey, handle, displayName, idToken } = e.detail;
+    // POST idToken to your backend; verify it there.
+  });
+&lt;/script&gt;</pre>
+      </div>
+    </details>
+    <details>
+      <summary>JS API</summary>
+      <div class="trust-body">
+        <pre class="signature">const result = await Web3Keys.signIn({
+  clientId: 'myapp.example.com',
+  nonce: yourServerProvidedNonce,
+});
+// result = { pubKey, address, handle, displayName, idToken }</pre>
+      </div>
+    </details>
+
+    <div id="status" class="status" role="status"></div>
+  </main>
+  <script type="module" src="/js/demo.js"></script>
+</body>
+</html>

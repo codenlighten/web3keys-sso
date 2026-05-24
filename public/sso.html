@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Sign in with Web3Keys</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <script src="/vendor/bsv.bundle.js"></script>
+  <script src="/vendor/bsv-mnemonic.min.js"></script>
+</head>
+<body>
+  <main class="card" id="app">
+    <header class="brand">
+      <div class="logo">w3k</div>
+      <div>
+        <div class="brand-name">Sign in to <span id="sso-app-name">an app</span></div>
+        <div class="brand-tagline">Web3Keys identity portal</div>
+      </div>
+    </header>
+
+    <section id="sso-noidentity" hidden>
+      <h1>You need a Web3Keys identity first</h1>
+      <p class="muted">Web3Keys identities are stored only on the device that created them. Open your wallet to create or restore one, then come back here.</p>
+      <div class="welcome-cta">
+        <a href="/" target="_blank" class="primary button-link">Open Web3Keys wallet</a>
+        <button id="sso-noidentity-refresh" class="ghost" type="button">I'm ready — try again</button>
+      </div>
+    </section>
+
+    <section id="sso-chooser" hidden>
+      <h1>Choose your identity</h1>
+      <p class="muted" id="sso-summary">You'll share your <strong>handle</strong>, <strong>display name</strong>, and <strong>public key</strong> with this app. Your signing key never leaves this device.</p>
+      <div id="sso-identities" class="identities-list"></div>
+      <div class="account-footer">
+        <button class="ghost" id="sso-cancel" type="button">Cancel</button>
+      </div>
+    </section>
+
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+  </main>
+  <script type="module" src="/js/sso.js"></script>
+</body>
+</html>
