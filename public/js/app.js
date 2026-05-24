@@ -7,16 +7,23 @@ import {
   isUserVerifyingPlatformAuthenticatorAvailable,
   registerPasskey, getPrfSecret,
 } from './biometric.js';
-import { getVault, putVault, clearVault } from './vault.js';
+import {
+  getVault, putVault, clearVault,
+  listVaults, setActiveVault, removeVault,
+} from './vault.js';
 import { requestConsent } from './consent.js';
 import {
   signMessage, parseTransaction, summarizeTransaction, signTransaction,
   signHash, encryptForRecipient, decryptIncoming,
   signAttestation, unlockMnemonic,
 } from './sign.js';
-import { setIdenticon } from './identicon.js';
+import { setIdenticon, identiconSvg } from './identicon.js';
 import { isValidHandle, checkHandleAvailable, buildClaimMessage, claimHandle } from './profile.js';
 import { buildAttestation, CLAIM_TYPES, verifyAttestation } from './attestations.js';
+import { attachChooser } from './chooser.js';
+
+const WELCOMED_KEY = 'web3keys:welcomed';
+let createMode = 'first'; // 'first' | 'add'
 
 const IDENTITY_PATH = "m/44'/236'/0'/0/0";
 const INFO_WIF = 'web3keys/v1/wif-wrap';
@@ -162,6 +169,7 @@ async function refreshAccountView(vault) {
 
   $('#acct-claim-handle').hidden = !!vault.handle;
   renderClaims(vault);
+  await renderIdentitiesList();
   showView('#view-account');
 }
 
@@ -186,6 +194,34 @@ function attachAvailabilityCheck(input, feedbackEl) {
   });
 }
 
+// ---- View routing ----
+function setEmptyTitle(mode) {
+  $('#empty-title').textContent = mode === 'add' ? 'Add another identity' : 'Claim your identity';
+  $('#btn-empty-back').hidden = mode !== 'add';
+  $('#btn-create').textContent = mode === 'add' ? 'Add identity' : 'Create identity';
+}
+
+function enterEmpty(mode) {
+  createMode = mode;
+  setEmptyTitle(mode);
+  $('#form-create').reset();
+  $('#form-restore').reset();
+  $('#restore-details').open = false;
+  showView('#view-empty');
+}
+
+async function routeAfterBoot() {
+  const vaults = await listVaults();
+  if (vaults.length > 0) {
+    const v = await activeVault();
+    await refreshAccountView(v);
+    return;
+  }
+  const welcomed = localStorage.getItem(WELCOMED_KEY) === '1';
+  if (welcomed) enterEmpty('first');
+  else showView('#view-welcome');
+}
+
 // ---- Boot ----
 async function boot() {
   if (!isPlatformAuthAvailable()) {
@@ -195,13 +231,10 @@ async function boot() {
     if (!uvpa) status('No platform biometric detected. You can still use a password fallback.', 'warn');
   }
 
-  const vault = await activeVault();
-  if (vault) await refreshAccountView(vault);
-  else showView('#view-empty');
-
   attachAvailabilityCheck($('#create-handle'), $('#handle-feedback'));
   attachAvailabilityCheck($('#latehandle-input'), $('#latehandle-feedback'));
 
+  wireWelcome();
   wireCreate();
   wireRestore();
   wireTabs();
@@ -212,6 +245,26 @@ async function boot() {
   wireHash();
   wireEncrypt();
   wireSettings();
+  wireChooser();
+
+  await routeAfterBoot();
+}
+
+function wireWelcome() {
+  $('#btn-welcome-create').addEventListener('click', () => {
+    localStorage.setItem(WELCOMED_KEY, '1');
+    enterEmpty('first');
+  });
+  $('#btn-welcome-restore').addEventListener('click', () => {
+    localStorage.setItem(WELCOMED_KEY, '1');
+    enterEmpty('first');
+    setTimeout(() => { $('#restore-details').open = true; $('#restore-mnemonic').focus(); }, 50);
+  });
+  $('#btn-empty-back').addEventListener('click', async () => {
+    const v = await activeVault();
+    if (v) { await refreshAccountView(v); return; }
+    showView('#view-welcome');
+  });
 }
 
 // ---- Create + claim-handle pipeline ----
@@ -812,6 +865,64 @@ function wireEncrypt() {
   });
 }
 
+// ---- Chooser ----
+async function switchToVault(vault) {
+  await setActiveVault(vault.pubKey);
+  invalidateVault();
+  const fresh = await activeVault();
+  await refreshAccountView(fresh);
+  status(`Switched to ${fresh.handle ? `@${fresh.handle}` : 'unnamed identity'}.`, 'ok');
+}
+
+async function startAddIdentity() {
+  enterEmpty('add');
+  status('Add an identity. Your current identity stays on this device.', 'info');
+}
+
+function wireChooser() {
+  attachChooser({
+    trigger: $('#acct-switcher'),
+    container: $('#chooser'),
+    getVaults: listVaults,
+    getActiveId: async () => (await activeVault())?.pubKey || null,
+    onPick: switchToVault,
+    onAddIdentity: startAddIdentity,
+  });
+}
+
+// ---- Settings: identities list ----
+async function renderIdentitiesList() {
+  const wrap = $('#identities-list');
+  wrap.innerHTML = '';
+  const vaults = await listVaults();
+  const active = await activeVault();
+  if (vaults.length === 0) {
+    wrap.append(Object.assign(document.createElement('div'), { className: 'muted small', textContent: 'No identities on this device.' }));
+    return;
+  }
+  vaults.forEach((v) => {
+    const isActive = active?.pubKey === v.pubKey;
+    const row = document.createElement('div');
+    row.className = 'identity-row' + (isActive ? ' active' : '');
+    row.innerHTML = `
+      <div class="identity-row-avatar">${identiconSvg(v.pubKey, 36)}</div>
+      <div class="identity-row-text">
+        <div class="identity-row-name">${escapeText(v.displayName || (v.handle ? `@${v.handle}` : 'Unnamed'))}${isActive ? ' <span class="pill" data-kind="ok">active</span>' : ''}</div>
+        <div class="identity-row-handle">${v.handle ? v.handle + '@web3keys.com' : 'No handle'}</div>
+      </div>
+      <div class="identity-row-actions">
+        ${isActive ? '' : `<button class="ghost" data-act="switch" data-id="${v.pubKey}">Switch</button>`}
+        <button class="ghost danger" data-act="remove" data-id="${v.pubKey}">Remove</button>
+      </div>
+    `;
+    wrap.append(row);
+  });
+}
+
+function escapeText(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 // ---- Settings (show phrase + reset) ----
 function wireSettings() {
   $('#btn-show-mnemonic').addEventListener('click', async () => {
@@ -842,17 +953,43 @@ function wireSettings() {
     $('#mnemonic-revealed').hidden = true;
     status('Phrase hidden.');
   });
-  $('#btn-signout').addEventListener('click', () => {
-    showView('#view-empty');
-    status('Signed out on this tab. Vault remains on this device.', 'info');
-  });
   $('#btn-reset').addEventListener('click', async () => {
-    if (!confirm('Erase the Web3Keys vault from this device? You will need your recovery phrase to restore it.')) return;
+    if (!confirm('Erase ALL Web3Keys identities from this device? You will need each recovery phrase to restore them.')) return;
     await clearVault();
     invalidateVault();
     pendingCreation = null;
-    showView('#view-empty');
+    localStorage.removeItem(WELCOMED_KEY);
+    showView('#view-welcome');
     status('Device erased.', 'ok');
+  });
+  $('#btn-settings-add').addEventListener('click', startAddIdentity);
+
+  $('#identities-list').addEventListener('click', async (e) => {
+    const btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    const id = btn.dataset.id;
+    if (btn.dataset.act === 'switch') {
+      const v = (await listVaults()).find((x) => x.pubKey === id);
+      if (v) await switchToVault(v);
+    } else if (btn.dataset.act === 'remove') {
+      const all = await listVaults();
+      const target = all.find((x) => x.pubKey === id);
+      if (!target) return;
+      const label = target.handle ? `@${target.handle}` : 'this identity';
+      if (!confirm(`Remove ${label} from this device? You'll need its recovery phrase to restore it elsewhere.`)) return;
+      await removeVault(id);
+      invalidateVault();
+      const remaining = await listVaults();
+      if (remaining.length === 0) {
+        localStorage.removeItem(WELCOMED_KEY);
+        showView('#view-welcome');
+        status('Last identity removed.', 'ok');
+      } else {
+        const next = await activeVault();
+        await refreshAccountView(next);
+        status(`${label} removed.`, 'ok');
+      }
+    }
   });
 }
 

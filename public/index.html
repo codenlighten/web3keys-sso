@@ -19,8 +19,49 @@
       </div>
     </header>
 
+    <section id="view-welcome" hidden>
+      <div class="welcome-hero">
+        <h1>Your identity, signed by you.</h1>
+        <p class="welcome-sub">Web3Keys is a noncustodial identity portal. You own the key. We can't see it, can't sell it, can't sign for you, and can't lock you in.</p>
+      </div>
+
+      <div class="welcome-pillars">
+        <div class="pillar">
+          <div class="pillar-icon" aria-hidden="true">⌁</div>
+          <h3>Owned by you</h3>
+          <p>Your signing key is generated on this device, encrypted by your biometric, and never leaves.</p>
+        </div>
+        <div class="pillar">
+          <div class="pillar-icon" aria-hidden="true">✓</div>
+          <h3>Verifiable claims</h3>
+          <p>Sign attestations about yourself or your work. Anyone can verify them anywhere — no server needed.</p>
+        </div>
+        <div class="pillar">
+          <div class="pillar-icon" aria-hidden="true">↗</div>
+          <h3>Yours to leave</h3>
+          <p>A 24-word recovery phrase recreates your identity on any device. No lock-in, no opaque vendor.</p>
+        </div>
+      </div>
+
+      <details class="trust-model">
+        <summary>How exactly does this work?</summary>
+        <div class="trust-body">
+          <p><strong>The key.</strong> When you create an identity, your browser generates a Bitcoin SV secp256k1 keypair from a 24-word recovery phrase. The private key is wrapped twice — once with a 256-bit secret derived from your platform biometric (via WebAuthn PRF), once with a key derived from your recovery passphrase. Both wrapped copies are stored in this browser only.</p>
+          <p><strong>The server.</strong> Our server holds your public handle (like a phone book entry) so dApps can recognize you by name. It never sees plaintext keys, mnemonics, or passphrases. If our server disappears, your identity still works — it just won't have a public profile page.</p>
+          <p><strong>Recovery.</strong> Your 24-word phrase IS your identity. We can't see it and we can't help you recover it. Anyone who reads it can recreate you on any device. Keep it offline.</p>
+          <p><strong>Open source.</strong> Every line is on GitHub. Audit it, fork it, run your own.</p>
+          <p><a href="https://github.com/codenlighten/web3keys-sso" target="_blank" rel="noopener">Source on GitHub →</a></p>
+        </div>
+      </details>
+
+      <div class="welcome-cta">
+        <button id="btn-welcome-create" class="primary">Create your identity</button>
+        <button id="btn-welcome-restore" class="ghost">I have a recovery phrase</button>
+      </div>
+    </section>
+
     <section id="view-empty" hidden>
-      <h1>Claim your identity</h1>
+      <h1 id="empty-title">Claim your identity</h1>
       <p class="muted">A noncustodial BSV identity you fully own — paymail handle, public profile, signed attestations. The signing key never leaves this device and only your biometric unlocks it.</p>
       <form id="form-create" autocomplete="off">
         <label>
@@ -41,8 +82,9 @@
           <small class="muted">Backup unlock if biometrics fail. Can't be recovered if you forget it — your recovery phrase still works.</small>
         </label>
         <button class="primary" type="submit" id="btn-create">Create identity</button>
+        <button type="button" class="ghost" id="btn-empty-back" hidden>Back</button>
       </form>
-      <details class="advanced">
+      <details class="advanced" id="restore-details">
         <summary>I already have a recovery phrase</summary>
         <form id="form-restore">
           <label>
@@ -84,18 +126,24 @@
     </section>
 
     <section id="view-account" hidden>
-      <div class="profile-header">
-        <div class="profile-header-avatar" id="acct-avatar"></div>
-        <div class="profile-header-text">
-          <div class="profile-header-name" id="acct-display">—</div>
-          <div class="profile-header-handle">
-            <span id="acct-handle-prefix">—</span><span class="muted">@web3keys.com</span>
-            <a id="acct-profile-link" class="profile-link" href="#" target="_blank" hidden>view public profile ↗</a>
+      <div class="profile-header-wrap">
+        <div class="profile-header">
+          <button type="button" class="profile-header-main" id="acct-switcher" aria-haspopup="true" aria-expanded="false">
+            <div class="profile-header-avatar" id="acct-avatar"></div>
+            <div class="profile-header-text">
+              <div class="profile-header-name" id="acct-display">—</div>
+              <div class="profile-header-handle">
+                <span id="acct-handle-prefix">—</span><span class="muted">@web3keys.com</span>
+              </div>
+            </div>
+            <div class="profile-header-chev" aria-hidden="true">⌄</div>
+          </button>
+          <div class="profile-header-meta">
+            <span id="acct-biometric" class="pill">—</span>
+            <a id="acct-profile-link" class="profile-link" href="#" target="_blank" hidden>view ↗</a>
           </div>
         </div>
-        <div class="profile-header-meta">
-          <span id="acct-biometric" class="pill">—</span>
-        </div>
+        <div id="chooser" class="chooser" hidden role="menu"></div>
       </div>
 
       <details class="account-details">
@@ -266,10 +314,14 @@
         <h3>Profile</h3>
         <div class="row"><span class="label">Public profile</span><a id="settings-profile-link" href="#" target="_blank">—</a></div>
 
+        <h3>Identities on this device</h3>
+        <div id="identities-list" class="identities-list"></div>
+        <button class="secondary" id="btn-settings-add">+ Add another identity</button>
+
         <h3>This device</h3>
+        <p class="muted">Every signature already re-prompts your biometric, so there's no separate "sign out." To stop using this device entirely, erase it below — make sure your recovery phrases are saved first.</p>
         <div class="account-footer">
-          <button class="ghost" id="btn-signout">Sign out (this tab)</button>
-          <button class="ghost danger" id="btn-reset">Erase this device</button>
+          <button class="ghost danger" id="btn-reset">Erase this device (all identities)</button>
         </div>
       </div>
     </section>
