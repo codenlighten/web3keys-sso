@@ -112,6 +112,8 @@ app.get('/u/:handle', (req, res) => {
   res.type('html').send(renderProfilePage(record));
 });
 
+app.get('/verify', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'verify.html')));
+
 // ---- Static fallback last ----
 
 app.use(express.static(path.join(__dirname, 'public'), {
