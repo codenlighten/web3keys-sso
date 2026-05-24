@@ -7,6 +7,7 @@ import 'dotenv/config';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 8787;
+const HOST = process.env.HOST || '127.0.0.1';
 
 app.use(cors());
 app.use(express.json({ limit: '256kb' }));
@@ -27,6 +28,6 @@ app.use(express.static(path.join(__dirname, 'public'), {
 
 app.get('/healthz', (_req, res) => res.json({ ok: true }));
 
-app.listen(PORT, () => {
-  console.log(`web3keys listening on http://localhost:${PORT}`);
+app.listen(PORT, HOST, () => {
+  console.log(`web3keys listening on http://${HOST}:${PORT}`);
 });
