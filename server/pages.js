@@ -7,12 +7,15 @@ function escapeHtml(s) {
 }
 
 function identiconSvg(pubKeyHex, size = 96) {
+  // Dark-on-dark identicon palette to match the SmartLedger theme: a deep
+  // panel background with bright accent cells. Hue still varies per pubkey
+  // so identities remain visually distinct.
   const hash = String(pubKeyHex || '').toLowerCase().padEnd(20, '0');
   const cells = [];
   for (let i = 0; i < 15; i++) cells.push((parseInt(hash[i] || '0', 16) & 1) === 1);
   const hue = parseInt(hash.slice(15, 18), 16) % 360;
-  const color = `hsl(${hue}, 60%, 42%)`;
-  const bg = `hsl(${hue}, 60%, 95%)`;
+  const color = `hsl(${hue}, 80%, 62%)`;
+  const bg = `hsl(${hue}, 60%, 12%)`;
   const cs = size / 5;
   let rects = '';
   for (let row = 0; row < 5; row++) {
@@ -37,19 +40,23 @@ export function renderProfilePage(record) {
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>${display} (@${handle}) — Web3Keys</title>
   <meta name="description" content="${display}'s verified identity on Web3Keys." />
-  <meta name="theme-color" content="#0a0c10" />
+  <meta name="theme-color" content="#020604" />
   <meta property="og:title" content="${display} (@${handle})" />
-  <meta property="og:description" content="Verified identity on Web3Keys" />
+  <meta property="og:description" content="Verified identity on Web3Keys, a SmartLedger Wallet" />
   <meta property="og:type" content="profile" />
   <meta property="og:url" content="https://web3keys.com/u/${handle}" />
   <meta name="twitter:card" content="summary" />
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/logo-32.png" />
+  <link rel="apple-touch-icon" href="/images/logo-180.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
-<body class="profile-body">
+<body class="shell-centered profile-body">
   <main class="card profile-card">
     <a class="profile-back" href="/">← Web3Keys</a>
     <div class="profile-avatar">${identiconSvg(record.pubKey, 112)}</div>
@@ -78,11 +85,16 @@ export function renderNotFoundPage(handle) {
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>@${h} not found — Web3Keys</title>
+  <meta name="theme-color" content="#020604" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/logo-32.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
-<body class="profile-body">
+<body class="shell-centered profile-body">
   <main class="card profile-card">
     <a class="profile-back" href="/">← Web3Keys</a>
     <h1>@${h} is unclaimed</h1>

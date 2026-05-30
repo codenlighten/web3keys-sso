@@ -2,32 +2,41 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="theme-color" content="#0a0c10" />
-  <title>Web3Keys — Your identity, signed by you</title>
-  <meta name="description" content="A noncustodial identity portal for the open web. Own your handle, your credentials, and what you choose to disclose. From SmartLedger." />
-  <meta property="og:title" content="Web3Keys — Your identity, signed by you" />
-  <meta property="og:description" content="A noncustodial identity portal for the open web. Own your handle, your credentials, and what you choose to disclose. From SmartLedger." />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#020604" />
+  <title>Web3Keys — A SmartLedger Wallet</title>
+  <meta name="description" content="Noncustodial identity portal from SmartLedger. Own your handle, your credentials, and what you choose to disclose." />
+  <meta property="og:title" content="Web3Keys — A SmartLedger Wallet" />
+  <meta property="og:description" content="Noncustodial identity portal from SmartLedger. Own your handle, your credentials, and what you choose to disclose." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://web3keys.com/" />
   <meta name="twitter:card" content="summary" />
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/logo-32.png" />
+  <link rel="apple-touch-icon" href="/images/logo-180.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="SmartLedger" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
-<body class="landing-body">
+<body class="landing-body"><!-- /favicon.svg removed; using /images/logo-* PNGs -->
 
-  <nav class="landing-nav">
-    <a href="/" class="landing-nav-brand">
-      <span class="landing-nav-mark">w3k</span>
-      <span class="landing-nav-name">Web3Keys</span>
+  <header class="topbar">
+    <a href="/" class="topbar-brand" aria-label="Web3Keys">
+      <img src="/images/logo-64.png" alt="" class="topbar-mark" width="28" height="28" />
+      <span class="topbar-name">Web3Keys</span>
     </a>
-    <div class="landing-nav-links">
-      <a href="/verify">Verify</a>
-      <a href="/demo">Demo</a>
-      <a href="https://github.com/codenlighten/web3keys-sso" target="_blank" rel="noopener">GitHub</a>
-      <a href="/app" class="primary button-link landing-nav-cta">Open wallet</a>
+    <div class="topbar-right">
+      <a href="/verify" class="topbar-link">Verify</a>
+      <a href="/demo" class="topbar-link">Demo</a>
+      <a href="https://github.com/codenlighten/web3keys-sso" target="_blank" rel="noopener" class="topbar-link">GitHub</a>
+      <span class="net-badge">BSV mainnet</span>
+      <a href="/app" class="primary button-link topbar-cta">Open wallet</a>
     </div>
-  </nav>
+  </header>
 
   <header class="landing-hero">
     <div class="landing-hero-eyebrow">
@@ -222,10 +231,10 @@
   <footer class="landing-footer">
     <div class="landing-footer-inner">
       <div class="landing-footer-brand">
-        <span class="landing-nav-mark">w3k</span>
+        <img src="/images/logo-64.png" alt="" class="landing-footer-brand-mark" width="32" height="32" />
         <div>
           <div class="brand-name">Web3Keys</div>
-          <div class="muted small">A <a href="https://smartledger.technology" target="_blank" rel="noopener">SmartLedger</a> product · est. 2019 · Wilmington, DE</div>
+          <div class="muted small">A <a href="https://smartledger.technology" target="_blank" rel="noopener">SmartLedger</a> wallet · est. 2019 · Wilmington, DE</div>
         </div>
       </div>
       <div class="landing-footer-cols">
