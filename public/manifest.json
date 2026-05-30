@@ -1,0 +1,15 @@
+{
+  "name": "Web3Keys — A SmartLedger Wallet",
+  "short_name": "Web3Keys",
+  "description": "Noncustodial BSV identity portal. Sign claims, verify others, control who knows what.",
+  "start_url": "/app",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#020604",
+  "theme_color": "#020604",
+  "icons": [
+    { "src": "/images/logo-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any" },
+    { "src": "/images/logo-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any" },
+    { "src": "/images/logo-512.png", "type": "image/png", "sizes": "512x512", "purpose": "maskable" }
+  ]
+}
